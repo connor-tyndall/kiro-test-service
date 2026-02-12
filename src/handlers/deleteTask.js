@@ -1,5 +1,6 @@
 const { error } = require('../lib/response');
 const { getTask, deleteTask } = require('../lib/dynamodb');
+const { validateApiKey } = require('../lib/auth');
 
 /**
  * Lambda handler for deleting a task
@@ -7,6 +8,12 @@ const { getTask, deleteTask } = require('../lib/dynamodb');
  * @returns {Promise<Object>} API Gateway response
  */
 exports.handler = async (event) => {
+  // Validate API key
+  const authError = validateApiKey(event);
+  if (authError) {
+    return authError;
+  }
+
   try {
     // Extract task ID from path parameters
     const taskId = event.pathParameters?.id;

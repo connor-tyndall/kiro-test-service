@@ -6,6 +6,7 @@ const {
   queryTasksByStatus, 
   queryTasksByPriority 
 } = require('../lib/dynamodb');
+const { validateApiKey } = require('../lib/auth');
 
 /**
  * Lambda handler for listing and filtering tasks
@@ -13,6 +14,12 @@ const {
  * @returns {Promise<Object>} API Gateway response
  */
 exports.handler = async (event) => {
+  // Validate API key
+  const authError = validateApiKey(event);
+  if (authError) {
+    return authError;
+  }
+
   try {
     // Extract query parameters
     const queryParams = event.queryStringParameters || {};

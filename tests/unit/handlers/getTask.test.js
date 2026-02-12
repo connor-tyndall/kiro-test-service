@@ -4,8 +4,16 @@ const { getTask } = require('../../../src/lib/dynamodb');
 jest.mock('../../../src/lib/dynamodb');
 
 describe('getTask handler', () => {
+  const originalEnv = process.env;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    process.env = { ...originalEnv };
+    process.env.API_KEY = 'test-api-key';
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
   });
 
   test('should retrieve existing task', async () => {
@@ -23,6 +31,9 @@ describe('getTask handler', () => {
     getTask.mockResolvedValue(mockTask);
 
     const event = {
+      headers: {
+        'x-api-key': 'test-api-key'
+      },
       pathParameters: { id: '123' }
     };
 
@@ -38,6 +49,9 @@ describe('getTask handler', () => {
     getTask.mockResolvedValue(null);
 
     const event = {
+      headers: {
+        'x-api-key': 'test-api-key'
+      },
       pathParameters: { id: 'nonexistent' }
     };
 
@@ -50,6 +64,9 @@ describe('getTask handler', () => {
 
   test('should return 400 for missing task ID', async () => {
     const event = {
+      headers: {
+        'x-api-key': 'test-api-key'
+      },
       pathParameters: {}
     };
 
@@ -64,6 +81,9 @@ describe('getTask handler', () => {
     getTask.mockRejectedValue(new Error('DynamoDB error'));
 
     const event = {
+      headers: {
+        'x-api-key': 'test-api-key'
+      },
       pathParameters: { id: '123' }
     };
 
@@ -72,5 +92,33 @@ describe('getTask handler', () => {
 
     expect(response.statusCode).toBe(503);
     expect(body.error).toBe('Service temporarily unavailable');
+  });
+
+  test('should return 401 for missing API key', async () => {
+    const event = {
+      headers: {},
+      pathParameters: { id: '123' }
+    };
+
+    const response = await handler(event);
+    const body = JSON.parse(response.body);
+
+    expect(response.statusCode).toBe(401);
+    expect(body.error).toBe('Missing API key');
+  });
+
+  test('should return 401 for invalid API key', async () => {
+    const event = {
+      headers: {
+        'x-api-key': 'wrong-key'
+      },
+      pathParameters: { id: '123' }
+    };
+
+    const response = await handler(event);
+    const body = JSON.parse(response.body);
+
+    expect(response.statusCode).toBe(401);
+    expect(body.error).toBe('Invalid API key');
   });
 });

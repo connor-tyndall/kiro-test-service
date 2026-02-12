@@ -9,6 +9,7 @@ const {
 jest.mock('../../../src/lib/dynamodb');
 
 describe('listTasks handler', () => {
+  const originalEnv = process.env;
   const mockTasks = [
     {
       id: '1',
@@ -34,12 +35,21 @@ describe('listTasks handler', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    process.env = { ...originalEnv };
+    process.env.API_KEY = 'test-api-key';
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
   });
 
   test('should list all tasks without filters', async () => {
     scanTasks.mockResolvedValue(mockTasks);
 
     const event = {
+      headers: {
+        'x-api-key': 'test-api-key'
+      },
       queryStringParameters: null
     };
 
@@ -55,6 +65,9 @@ describe('listTasks handler', () => {
     queryTasksByAssignee.mockResolvedValue([mockTasks[0]]);
 
     const event = {
+      headers: {
+        'x-api-key': 'test-api-key'
+      },
       queryStringParameters: {
         assignee: 'user1@example.com'
       }
@@ -73,6 +86,9 @@ describe('listTasks handler', () => {
     queryTasksByStatus.mockResolvedValue([mockTasks[1]]);
 
     const event = {
+      headers: {
+        'x-api-key': 'test-api-key'
+      },
       queryStringParameters: {
         status: 'in-progress'
       }
@@ -90,6 +106,9 @@ describe('listTasks handler', () => {
     queryTasksByPriority.mockResolvedValue([mockTasks[0]]);
 
     const event = {
+      headers: {
+        'x-api-key': 'test-api-key'
+      },
       queryStringParameters: {
         priority: 'P1'
       }
@@ -107,6 +126,9 @@ describe('listTasks handler', () => {
     scanTasks.mockResolvedValue(mockTasks);
 
     const event = {
+      headers: {
+        'x-api-key': 'test-api-key'
+      },
       queryStringParameters: {
         dueDateBefore: '2024-12-01'
       }
@@ -124,6 +146,9 @@ describe('listTasks handler', () => {
     queryTasksByAssignee.mockResolvedValue(mockTasks);
 
     const event = {
+      headers: {
+        'x-api-key': 'test-api-key'
+      },
       queryStringParameters: {
         assignee: 'user1@example.com',
         status: 'open'
@@ -143,6 +168,9 @@ describe('listTasks handler', () => {
     scanTasks.mockResolvedValue([]);
 
     const event = {
+      headers: {
+        'x-api-key': 'test-api-key'
+      },
       queryStringParameters: null
     };
 
@@ -155,6 +183,9 @@ describe('listTasks handler', () => {
 
   test('should reject invalid priority', async () => {
     const event = {
+      headers: {
+        'x-api-key': 'test-api-key'
+      },
       queryStringParameters: {
         priority: 'invalid'
       }
@@ -167,6 +198,9 @@ describe('listTasks handler', () => {
 
   test('should reject invalid status', async () => {
     const event = {
+      headers: {
+        'x-api-key': 'test-api-key'
+      },
       queryStringParameters: {
         status: 'invalid'
       }
@@ -181,6 +215,9 @@ describe('listTasks handler', () => {
     scanTasks.mockRejectedValue(new Error('DynamoDB error'));
 
     const event = {
+      headers: {
+        'x-api-key': 'test-api-key'
+      },
       queryStringParameters: null
     };
 
@@ -189,5 +226,33 @@ describe('listTasks handler', () => {
 
     expect(response.statusCode).toBe(503);
     expect(body.error).toBe('Service temporarily unavailable');
+  });
+
+  test('should return 401 for missing API key', async () => {
+    const event = {
+      headers: {},
+      queryStringParameters: null
+    };
+
+    const response = await handler(event);
+    const body = JSON.parse(response.body);
+
+    expect(response.statusCode).toBe(401);
+    expect(body.error).toBe('Missing API key');
+  });
+
+  test('should return 401 for invalid API key', async () => {
+    const event = {
+      headers: {
+        'x-api-key': 'wrong-key'
+      },
+      queryStringParameters: null
+    };
+
+    const response = await handler(event);
+    const body = JSON.parse(response.body);
+
+    expect(response.statusCode).toBe(401);
+    expect(body.error).toBe('Invalid API key');
   });
 });

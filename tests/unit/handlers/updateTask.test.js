@@ -4,6 +4,7 @@ const { getTask, putTask } = require('../../../src/lib/dynamodb');
 jest.mock('../../../src/lib/dynamodb');
 
 describe('updateTask handler', () => {
+  const originalEnv = process.env;
   const mockExistingTask = {
     id: '123',
     description: 'Original task',
@@ -17,6 +18,12 @@ describe('updateTask handler', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    process.env = { ...originalEnv };
+    process.env.API_KEY = 'test-api-key';
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
   });
 
   test('should update task fields', async () => {
@@ -24,6 +31,9 @@ describe('updateTask handler', () => {
     putTask.mockResolvedValue({});
 
     const event = {
+      headers: {
+        'x-api-key': 'test-api-key'
+      },
       pathParameters: { id: '123' },
       body: JSON.stringify({
         description: 'Updated task',
@@ -45,6 +55,9 @@ describe('updateTask handler', () => {
     putTask.mockResolvedValue({});
 
     const event = {
+      headers: {
+        'x-api-key': 'test-api-key'
+      },
       pathParameters: { id: '123' },
       body: JSON.stringify({
         id: 'new-id',
@@ -65,6 +78,9 @@ describe('updateTask handler', () => {
     putTask.mockResolvedValue({});
 
     const event = {
+      headers: {
+        'x-api-key': 'test-api-key'
+      },
       pathParameters: { id: '123' },
       body: JSON.stringify({
         description: 'Updated'
@@ -81,6 +97,9 @@ describe('updateTask handler', () => {
     getTask.mockResolvedValue(null);
 
     const event = {
+      headers: {
+        'x-api-key': 'test-api-key'
+      },
       pathParameters: { id: 'nonexistent' },
       body: JSON.stringify({ description: 'Updated' })
     };
@@ -96,6 +115,9 @@ describe('updateTask handler', () => {
     getTask.mockResolvedValue(mockExistingTask);
 
     const event = {
+      headers: {
+        'x-api-key': 'test-api-key'
+      },
       pathParameters: { id: '123' },
       body: JSON.stringify({
         priority: 'invalid'
@@ -112,6 +134,9 @@ describe('updateTask handler', () => {
     putTask.mockResolvedValue({});
 
     const event = {
+      headers: {
+        'x-api-key': 'test-api-key'
+      },
       pathParameters: { id: '123' },
       body: JSON.stringify({
         assignee: null
@@ -123,5 +148,35 @@ describe('updateTask handler', () => {
 
     expect(response.statusCode).toBe(200);
     expect(body.assignee).toBeNull();
+  });
+
+  test('should return 401 for missing API key', async () => {
+    const event = {
+      headers: {},
+      pathParameters: { id: '123' },
+      body: JSON.stringify({ description: 'Updated' })
+    };
+
+    const response = await handler(event);
+    const body = JSON.parse(response.body);
+
+    expect(response.statusCode).toBe(401);
+    expect(body.error).toBe('Missing API key');
+  });
+
+  test('should return 401 for invalid API key', async () => {
+    const event = {
+      headers: {
+        'x-api-key': 'wrong-key'
+      },
+      pathParameters: { id: '123' },
+      body: JSON.stringify({ description: 'Updated' })
+    };
+
+    const response = await handler(event);
+    const body = JSON.parse(response.body);
+
+    expect(response.statusCode).toBe(401);
+    expect(body.error).toBe('Invalid API key');
   });
 });

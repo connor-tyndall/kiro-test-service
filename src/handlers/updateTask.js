@@ -1,6 +1,7 @@
 const { validateTaskInput } = require('../lib/validation');
 const { error, success, formatTask } = require('../lib/response');
 const { getTask, putTask } = require('../lib/dynamodb');
+const { validateApiKey } = require('../lib/auth');
 
 /**
  * Lambda handler for updating a task
@@ -8,6 +9,12 @@ const { getTask, putTask } = require('../lib/dynamodb');
  * @returns {Promise<Object>} API Gateway response
  */
 exports.handler = async (event) => {
+  // Validate API key
+  const authError = validateApiKey(event);
+  if (authError) {
+    return authError;
+  }
+
   try {
     // Extract task ID from path parameters
     const taskId = event.pathParameters?.id;
