@@ -2,59 +2,71 @@
 
 ## Context
 
-We're systematically testing Kiro.dev (AWS's agentic IDE) in preparation for a meeting with Amazon/AWS in Seattle next week. The goal is to have hands-on experience, formed opinions, and smart questions ready.
+We're systematically testing Kiro.dev (AWS's agentic IDE + CLI + autonomous agent) in preparation for a meeting with Amazon/AWS in Seattle next week. The goal is to have hands-on experience, formed opinions, and smart questions ready.
+
+## Status
+
+- **Phase 1**: Spec-Driven Development — **COMPLETE** (4/5)
+- **Phase 2b**: Kiro CLI Evaluation — **COMPLETE** (12/12 tests, 4/5 overall)
+- **Phase 2**: BigWeaver Autonomous Agent — **BLOCKED** (waiting on access)
 
 ## What's Done
 
-**Phase 1: Spec-Driven Development — COMPLETE**
+### Phase 1: Spec-Driven Development (COMPLETE)
+- Kiro's full spec pipeline: requirements → design → tasks → implementation
+- 5 Lambda handlers, 3 shared modules, full Terraform, 94 tests, 93% coverage
+- Spec pipeline is Kiro's strongest feature — traceability chain is genuinely valuable
+- Terminal integration is flaky (2/5), skipped its own property tests
 
-- Created a fresh repo `~/repos/kiro-test-service` (AWS serverless task tracker API)
-- Ran Kiro's full spec pipeline: requirements → design → tasks → implementation
-- Kiro generated a complete working API: 5 Lambda handlers, 3 shared modules, full Terraform, 94 passing tests, 93% coverage
-- All findings are logged in the Obsidian vault: `Vault 687/Meetings/2026-02-11 - Kiro Testing & AWS Meeting Prep.md`
-- Key findings so far: spec pipeline is genuinely good (4/5), terminal integration is flaky (2/5), skipped its own property tests
+### Phase 2b: Kiro CLI Evaluation (COMPLETE — 12/12 tests)
 
-## What's Next
+| Test | Rating | Winner |
+|------|--------|--------|
+| D.1 Install + auth | 4/5 | Tie |
+| D.2 Codebase understanding | 4/5 | Tie |
+| D.3 Email validation | 4/5 | Tie |
+| D.4 API key auth (12 files) | 5/5 | Slight Kiro edge |
+| D.5 MCP integration | 5/5 | Tie |
+| E.1 Knowledge bases | 4/5 | Kiro advantage |
+| E.2 Custom agents | 4/5 | Kiro advantage |
+| E.3 Subagents/parallel | 4/5 | Slight Kiro edge |
+| E.4 Translate command | 2/5 | Neither |
+| E.5 Steering files | 4/5 | Tie |
+| E.6 Hooks | 4/5 | Tie |
+| E.7 Head-to-head (pagination) | 4/5 | Tie |
 
-**Phase 2: Hooks — Kiro's biggest differentiator vs Claude Code**
+### Key Findings
 
-The testing plan (from the vault note) says:
+**Kiro CLI Advantages:** Knowledge bases, custom agent configs (per-agent MCP/tools/hooks), auto-parallel detection, auto model selection, MCP CLI UX, permission UX (`y/n/t`)
 
-1. Create a hook that runs tests on file save
-2. Create a hook that generates commit messages
-3. Create a hook that runs security scan before commit
-4. Test hook with an actual code change — modify a handler and watch what happens
-5. Test hook failure handling — what happens when the hook action fails
+**Claude Code Advantages:** Agent teams (peer-to-peer comms), Opus 4.6, mature ecosystem, plan mode, terminal reliability, speed
 
-Questions to answer:
-- How responsive are hooks? (Blog says 2-5s for simple, 2+ min for complex)
-- Can hooks chain together?
-- How is hook configuration structured?
-- How do hooks compare to our Python-based hooks in `~/.claude/hooks/`?
+**Tie:** Code generation quality, MCP support, hooks, steering/config
 
-**After Phase 2, remaining phases:**
-- Phase 3: Steering refinement (30 min)
-- Phase 4: Autonomous agent on real tasks (30 min)
-- Phase 5: Powers & MCP (20 min)
-- Phase 6: CLI evaluation (15 min)
-- Phase 7: Enterprise evaluation (20 min)
+## What's Remaining
+
+1. **BigWeaver autonomous agent** — setup + 7 test scenarios (C.1-C.7) when access arrives
+2. **Prepare demo scenarios** for meeting
+3. **Draft concrete proposals** for AWS team
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `Vault 687/Meetings/2026-02-11 - Kiro Testing & AWS Meeting Prep.md` | Master notes — update findings here as we test |
-| `~/repos/kiro-test-service/` | Test project (Kiro-generated AWS serverless API) |
-| `~/repos/kiro-test-service/.kiro/specs/engineering-task-api/` | Kiro's generated spec (requirements, design, tasks) |
-| `~/repos/ee-plugins/.kiro/` | Earlier Kiro testing (steering + specs on ee-plugins repo) |
+| `Vault 687/Meetings/2026-02-11 - Kiro Testing & AWS Meeting Prep.md` | Master notes with all findings |
+| `~/repos/kiro-test-service/` | Test project (serverless API) |
+| `~/repos/kiro-test-service/.kiro/` | Specs, steering, agent configs |
+| `~/.kiro/agents/api-reviewer.json` | Custom agent (global) |
 
-## How We Work
+## Gotchas
 
-- I guide you step-by-step through what to do in Kiro
-- You do it and report back what happened
-- I analyze findings, compare to Claude Code, and update the vault note automatically
-- The vault note has a comparison matrix, questions for AWS, and meeting prep checklist that get filled in as we go
+- `GITHUB_TOKEN` env var points to GHE — use `GITHUB_TOKEN="" gh ...` for github.com
+- Kiro CLI auth is via IAM Identity Center (awskiro account)
+- Knowledge base indexing is slow (~9 min) but persists
+- `translate` command has escaping bugs
+- Kiro agent JSON doesn't tolerate special chars (arrows, literal newlines in strings)
+- BigWeaver PDF: `/Users/connor.tyndall/Library/CloudStorage/OneDrive-CoxAutomotive/Desktop/bigweaver-beta-v1.pdf`
 
-## Resume Prompt
+## Resume Command
 
-> We're testing Kiro.dev for a Seattle meeting with AWS next week. Phase 1 (spec-driven development) is done — findings are in `Vault 687/Meetings/2026-02-11 - Kiro Testing & AWS Meeting Prep.md`. Read that file first to get caught up, then guide me through Phase 2: testing Kiro hooks on the `~/repos/kiro-test-service` project. Update the vault note with findings as we go.
+> Continue Kiro evaluation for Seattle AWS meeting. Working in `~/repos/kiro-test-service`. Phase 1 (spec-driven dev) and Phase 2b (CLI, 12/12 tests) complete. Read the vault note at `Vault 687/Meetings/2026-02-11 - Kiro Testing & AWS Meeting Prep.md` for full findings. Next steps: (1) BigWeaver autonomous agent setup when access arrives (7 test scenarios C.1-C.7), (2) Prepare demo scenarios and concrete proposals for meeting.

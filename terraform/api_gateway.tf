@@ -22,6 +22,13 @@ resource "aws_api_gateway_resource" "task_id" {
   path_part   = "{id}"
 }
 
+# /health resource
+resource "aws_api_gateway_resource" "health" {
+  rest_api_id = aws_api_gateway_rest_api.task_api.id
+  parent_id   = aws_api_gateway_rest_api.task_api.root_resource_id
+  path_part   = "health"
+}
+
 # POST /tasks - Create Task
 resource "aws_api_gateway_method" "create_task" {
   rest_api_id   = aws_api_gateway_rest_api.task_api.id
@@ -148,6 +155,31 @@ resource "aws_lambda_permission" "list_tasks" {
   source_arn    = "${aws_api_gateway_rest_api.task_api.execution_arn}/*/*"
 }
 
+# GET /health - Health Check
+resource "aws_api_gateway_method" "health" {
+  rest_api_id   = aws_api_gateway_rest_api.task_api.id
+  resource_id   = aws_api_gateway_resource.health.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "health" {
+  rest_api_id             = aws_api_gateway_rest_api.task_api.id
+  resource_id             = aws_api_gateway_resource.health.id
+  http_method             = aws_api_gateway_method.health.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.health.invoke_arn
+}
+
+resource "aws_lambda_permission" "health" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.health.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.task_api.execution_arn}/*/*"
+}
+
 # API Gateway Deployment
 resource "aws_api_gateway_deployment" "task_api" {
   rest_api_id = aws_api_gateway_rest_api.task_api.id
@@ -157,7 +189,8 @@ resource "aws_api_gateway_deployment" "task_api" {
     aws_api_gateway_integration.get_task,
     aws_api_gateway_integration.update_task,
     aws_api_gateway_integration.delete_task,
-    aws_api_gateway_integration.list_tasks
+    aws_api_gateway_integration.list_tasks,
+    aws_api_gateway_integration.health
   ]
 
   lifecycle {

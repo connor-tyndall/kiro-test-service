@@ -75,19 +75,36 @@ async function deleteTask(id) {
 
 /**
  * Scans all tasks from DynamoDB
- * @returns {Promise<Array>} Array of task objects
+ * @param {number} limit - Maximum number of items to return
+ * @param {string} nextToken - Pagination token
+ * @returns {Promise<Object>} Object with items and nextToken
  */
-async function scanTasks() {
+async function scanTasks(limit, nextToken) {
   try {
-    const result = await docClient.send(new ScanCommand({
+    const params = {
       TableName: TABLE_NAME,
       FilterExpression: 'begins_with(PK, :prefix)',
       ExpressionAttributeValues: {
         ':prefix': 'TASK#'
       }
-    }));
+    };
 
-    return result.Items || [];
+    if (limit) {
+      params.Limit = limit;
+    }
+
+    if (nextToken) {
+      params.ExclusiveStartKey = JSON.parse(Buffer.from(nextToken, 'base64').toString());
+    }
+
+    const result = await docClient.send(new ScanCommand(params));
+
+    return {
+      items: result.Items || [],
+      nextToken: result.LastEvaluatedKey 
+        ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64')
+        : null
+    };
   } catch (error) {
     console.error('DynamoDB scanTasks error:', error);
     throw new Error('Service temporarily unavailable');
@@ -97,20 +114,37 @@ async function scanTasks() {
 /**
  * Queries tasks by assignee using GSI1
  * @param {string} assignee - Assignee identifier
- * @returns {Promise<Array>} Array of task objects
+ * @param {number} limit - Maximum number of items to return
+ * @param {string} nextToken - Pagination token
+ * @returns {Promise<Object>} Object with items and nextToken
  */
-async function queryTasksByAssignee(assignee) {
+async function queryTasksByAssignee(assignee, limit, nextToken) {
   try {
-    const result = await docClient.send(new QueryCommand({
+    const params = {
       TableName: TABLE_NAME,
       IndexName: 'GSI1',
       KeyConditionExpression: 'assignee = :assignee',
       ExpressionAttributeValues: {
         ':assignee': assignee
       }
-    }));
+    };
 
-    return result.Items || [];
+    if (limit) {
+      params.Limit = limit;
+    }
+
+    if (nextToken) {
+      params.ExclusiveStartKey = JSON.parse(Buffer.from(nextToken, 'base64').toString());
+    }
+
+    const result = await docClient.send(new QueryCommand(params));
+
+    return {
+      items: result.Items || [],
+      nextToken: result.LastEvaluatedKey 
+        ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64')
+        : null
+    };
   } catch (error) {
     console.error('DynamoDB queryTasksByAssignee error:', error);
     throw new Error('Service temporarily unavailable');
@@ -120,11 +154,13 @@ async function queryTasksByAssignee(assignee) {
 /**
  * Queries tasks by status using GSI2
  * @param {string} status - Task status
- * @returns {Promise<Array>} Array of task objects
+ * @param {number} limit - Maximum number of items to return
+ * @param {string} nextToken - Pagination token
+ * @returns {Promise<Object>} Object with items and nextToken
  */
-async function queryTasksByStatus(status) {
+async function queryTasksByStatus(status, limit, nextToken) {
   try {
-    const result = await docClient.send(new QueryCommand({
+    const params = {
       TableName: TABLE_NAME,
       IndexName: 'GSI2',
       KeyConditionExpression: '#status = :status',
@@ -134,9 +170,24 @@ async function queryTasksByStatus(status) {
       ExpressionAttributeValues: {
         ':status': status
       }
-    }));
+    };
 
-    return result.Items || [];
+    if (limit) {
+      params.Limit = limit;
+    }
+
+    if (nextToken) {
+      params.ExclusiveStartKey = JSON.parse(Buffer.from(nextToken, 'base64').toString());
+    }
+
+    const result = await docClient.send(new QueryCommand(params));
+
+    return {
+      items: result.Items || [],
+      nextToken: result.LastEvaluatedKey 
+        ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64')
+        : null
+    };
   } catch (error) {
     console.error('DynamoDB queryTasksByStatus error:', error);
     throw new Error('Service temporarily unavailable');
@@ -146,20 +197,37 @@ async function queryTasksByStatus(status) {
 /**
  * Queries tasks by priority using GSI3
  * @param {string} priority - Task priority
- * @returns {Promise<Array>} Array of task objects
+ * @param {number} limit - Maximum number of items to return
+ * @param {string} nextToken - Pagination token
+ * @returns {Promise<Object>} Object with items and nextToken
  */
-async function queryTasksByPriority(priority) {
+async function queryTasksByPriority(priority, limit, nextToken) {
   try {
-    const result = await docClient.send(new QueryCommand({
+    const params = {
       TableName: TABLE_NAME,
       IndexName: 'GSI3',
       KeyConditionExpression: 'priority = :priority',
       ExpressionAttributeValues: {
         ':priority': priority
       }
-    }));
+    };
 
-    return result.Items || [];
+    if (limit) {
+      params.Limit = limit;
+    }
+
+    if (nextToken) {
+      params.ExclusiveStartKey = JSON.parse(Buffer.from(nextToken, 'base64').toString());
+    }
+
+    const result = await docClient.send(new QueryCommand(params));
+
+    return {
+      items: result.Items || [],
+      nextToken: result.LastEvaluatedKey 
+        ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64')
+        : null
+    };
   } catch (error) {
     console.error('DynamoDB queryTasksByPriority error:', error);
     throw new Error('Service temporarily unavailable');

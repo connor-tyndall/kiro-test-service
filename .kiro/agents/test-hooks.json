@@ -1,0 +1,23 @@
+{
+  "name": "test-hooks",
+  "description": "Agent with hooks for testing - runs npm test after file writes",
+  "prompt": "You are a helpful coding assistant. Follow existing code patterns in this project.",
+  "mcpServers": {},
+  "tools": ["*"],
+  "toolAliases": {},
+  "allowedTools": [],
+  "resources": [],
+  "hooks": {
+    "postToolUse": [
+      {
+        "matcher": "fs_write",
+        "command": "npm test",
+        "description": "Run tests after file writes",
+        "timeout_ms": 60000
+      }
+    ]
+  },
+  "toolsSettings": {},
+  "useLegacyMcpJson": true,
+  "model": null
+}

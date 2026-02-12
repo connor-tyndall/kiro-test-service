@@ -175,3 +175,20 @@ resource "aws_lambda_function" "list_tasks" {
     ignore_changes = [source_code_hash]
   }
 }
+
+# Health Check Lambda
+resource "aws_lambda_function" "health" {
+  filename         = "lambda-functions.zip"
+  function_name    = "engineering-task-api-health"
+  role            = aws_iam_role.lambda_role.arn
+  handler         = "handlers/health.handler"
+  runtime         = var.lambda_runtime
+  source_code_hash = fileexists("lambda-functions.zip") ? filebase64sha256("lambda-functions.zip") : null
+  timeout         = 30
+
+  layers = [aws_lambda_layer_version.shared_layer.arn]
+
+  lifecycle {
+    ignore_changes = [source_code_hash]
+  }
+}

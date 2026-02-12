@@ -44,7 +44,7 @@ describe('listTasks handler', () => {
   });
 
   test('should list all tasks without filters', async () => {
-    scanTasks.mockResolvedValue(mockTasks);
+    scanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
 
     const event = {
       headers: {
@@ -58,11 +58,11 @@ describe('listTasks handler', () => {
 
     expect(response.statusCode).toBe(200);
     expect(body.tasks).toHaveLength(2);
-    expect(scanTasks).toHaveBeenCalled();
+    expect(scanTasks).toHaveBeenCalledWith(20, undefined);
   });
 
   test('should filter by assignee', async () => {
-    queryTasksByAssignee.mockResolvedValue([mockTasks[0]]);
+    queryTasksByAssignee.mockResolvedValue({ items: [mockTasks[0]], nextToken: null });
 
     const event = {
       headers: {
@@ -79,11 +79,11 @@ describe('listTasks handler', () => {
     expect(response.statusCode).toBe(200);
     expect(body.tasks).toHaveLength(1);
     expect(body.tasks[0].assignee).toBe('user1@example.com');
-    expect(queryTasksByAssignee).toHaveBeenCalledWith('user1@example.com');
+    expect(queryTasksByAssignee).toHaveBeenCalledWith('user1@example.com', 20, undefined);
   });
 
   test('should filter by status', async () => {
-    queryTasksByStatus.mockResolvedValue([mockTasks[1]]);
+    queryTasksByStatus.mockResolvedValue({ items: [mockTasks[1]], nextToken: null });
 
     const event = {
       headers: {
@@ -103,7 +103,7 @@ describe('listTasks handler', () => {
   });
 
   test('should filter by priority', async () => {
-    queryTasksByPriority.mockResolvedValue([mockTasks[0]]);
+    queryTasksByPriority.mockResolvedValue({ items: [mockTasks[0]], nextToken: null });
 
     const event = {
       headers: {
@@ -123,7 +123,7 @@ describe('listTasks handler', () => {
   });
 
   test('should filter by due date', async () => {
-    scanTasks.mockResolvedValue(mockTasks);
+    scanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
 
     const event = {
       headers: {
@@ -143,7 +143,7 @@ describe('listTasks handler', () => {
   });
 
   test('should apply multiple filters', async () => {
-    queryTasksByAssignee.mockResolvedValue(mockTasks);
+    queryTasksByAssignee.mockResolvedValue({ items: mockTasks, nextToken: null });
 
     const event = {
       headers: {
@@ -165,7 +165,7 @@ describe('listTasks handler', () => {
   });
 
   test('should return empty array when no matches', async () => {
-    scanTasks.mockResolvedValue([]);
+    scanTasks.mockResolvedValue({ items: [], nextToken: null });
 
     const event = {
       headers: {
@@ -224,8 +224,8 @@ describe('listTasks handler', () => {
     const response = await handler(event);
     const body = JSON.parse(response.body);
 
-    expect(response.statusCode).toBe(503);
-    expect(body.error).toBe('Service temporarily unavailable');
+    expect(response.statusCode).toBe(500);
+    expect(body.error).toBe('Internal server error: listing tasks');
   });
 
   test('should return 401 for missing API key', async () => {
@@ -254,5 +254,184 @@ describe('listTasks handler', () => {
 
     expect(response.statusCode).toBe(401);
     expect(body.error).toBe('Invalid API key');
+  });
+
+  describe('Pagination', () => {
+    test('should use default limit of 20', async () => {
+      scanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: null
+      };
+
+      await handler(event);
+
+      expect(scanTasks).toHaveBeenCalledWith(20, undefined);
+    });
+
+    test('should accept custom limit', async () => {
+      scanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          limit: '50'
+        }
+      };
+
+      await handler(event);
+
+      expect(scanTasks).toHaveBeenCalledWith(50, undefined);
+    });
+
+    test('should pass nextToken to DynamoDB', async () => {
+      const token = 'test-token';
+      scanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          nextToken: token
+        }
+      };
+
+      await handler(event);
+
+      expect(scanTasks).toHaveBeenCalledWith(20, token);
+    });
+
+    test('should return nextToken when more results available', async () => {
+      const nextToken = 'next-page-token';
+      scanTasks.mockResolvedValue({ items: mockTasks, nextToken });
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: null
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(body.nextToken).toBe(nextToken);
+    });
+
+    test('should not return nextToken when no more results', async () => {
+      scanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: null
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(body.nextToken).toBeUndefined();
+    });
+
+    test('should reject limit below minimum', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          limit: '0'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toBe('Limit must be at least 1');
+    });
+
+    test('should reject limit above maximum', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          limit: '101'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toBe('Limit must not exceed 100');
+    });
+
+    test('should reject non-numeric limit', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          limit: 'abc'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toBe('Limit must be a number');
+    });
+
+    test('should work with pagination and filters', async () => {
+      const nextToken = 'next-page-token';
+      queryTasksByAssignee.mockResolvedValue({ items: [mockTasks[0]], nextToken });
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          assignee: 'user1@example.com',
+          limit: '10',
+          nextToken: 'prev-token'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.tasks).toHaveLength(1);
+      expect(body.nextToken).toBe(nextToken);
+      expect(queryTasksByAssignee).toHaveBeenCalledWith('user1@example.com', 10, 'prev-token');
+    });
+  });
+
+  describe('Edge Cases', () => {
+    test('should handle decimal limit', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          limit: '20.5'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toBe('Limit must be an integer');
+    });
   });
 });

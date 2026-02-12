@@ -5,6 +5,7 @@ const {
   validateDateFormat,
   validateDescription,
   validateAssignee,
+  validateLimit,
   VALID_PRIORITIES,
   VALID_STATUSES
 } = require('../../src/lib/validation');
@@ -279,6 +280,54 @@ describe('Validation Module', () => {
       });
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
+    });
+  });
+
+  describe('validateLimit', () => {
+    test('should accept valid limit as number', () => {
+      expect(validateLimit(20)).toBeNull();
+    });
+
+    test('should accept valid limit as string', () => {
+      expect(validateLimit('50')).toBeNull();
+    });
+
+    test('should accept minimum limit', () => {
+      expect(validateLimit(1)).toBeNull();
+    });
+
+    test('should accept maximum limit', () => {
+      expect(validateLimit(100)).toBeNull();
+    });
+
+    test('should reject non-numeric limit', () => {
+      expect(validateLimit('abc')).toBe('Limit must be a number');
+    });
+
+    test('should reject decimal limit', () => {
+      expect(validateLimit(20.5)).toBe('Limit must be an integer');
+    });
+
+    test('should reject limit below minimum', () => {
+      expect(validateLimit(0)).toBe('Limit must be at least 1');
+    });
+
+    test('should reject negative limit', () => {
+      expect(validateLimit(-5)).toBe('Limit must be at least 1');
+    });
+
+    test('should reject limit above maximum', () => {
+      expect(validateLimit(101)).toBe('Limit must not exceed 100');
+    });
+  });
+
+  describe('Edge Cases', () => {
+    test('should handle empty string limit', () => {
+      expect(validateLimit('')).toBe('Limit must be at least 1');
+    });
+
+    test('should handle null limit', () => {
+      expect(validateLimit(null)).toBe('Limit must be at least 1');
     });
   });
 });

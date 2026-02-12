@@ -162,6 +162,33 @@ function validateAssignee(assignee) {
   return null;
 }
 
+/**
+ * Validates pagination limit parameter
+ * @param {string|number} limit - Limit value to validate
+ * @returns {string|null} Error message or null if valid
+ */
+function validateLimit(limit) {
+  const numLimit = Number(limit);
+  
+  if (isNaN(numLimit)) {
+    return 'Limit must be a number';
+  }
+  
+  if (!Number.isInteger(numLimit)) {
+    return 'Limit must be an integer';
+  }
+  
+  if (numLimit < 1) {
+    return 'Limit must be at least 1';
+  }
+  
+  if (numLimit > 100) {
+    return 'Limit must not exceed 100';
+  }
+  
+  return null;
+}
+
 module.exports = {
   validateTaskInput,
   validatePriority,
@@ -169,6 +196,7 @@ module.exports = {
   validateDateFormat,
   validateDescription,
   validateAssignee,
+  validateLimit,
   VALID_PRIORITIES,
   VALID_STATUSES
 };
