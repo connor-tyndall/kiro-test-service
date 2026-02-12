@@ -1,0 +1,72 @@
+const { handler } = require('../../../src/handlers/deleteTask');
+const { getTask, deleteTask } = require('../../../src/lib/dynamodb');
+
+jest.mock('../../../src/lib/dynamodb');
+
+describe('deleteTask handler', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('should delete existing task', async () => {
+    const mockTask = {
+      id: '123',
+      description: 'Test task'
+    };
+
+    getTask.mockResolvedValue(mockTask);
+    deleteTask.mockResolvedValue();
+
+    const event = {
+      pathParameters: { id: '123' }
+    };
+
+    const response = await handler(event);
+
+    expect(response.statusCode).toBe(204);
+    expect(response.body).toBe('');
+    expect(deleteTask).toHaveBeenCalledWith('123');
+  });
+
+  test('should return 404 for non-existent task', async () => {
+    getTask.mockResolvedValue(null);
+
+    const event = {
+      pathParameters: { id: 'nonexistent' }
+    };
+
+    const response = await handler(event);
+    const body = JSON.parse(response.body);
+
+    expect(response.statusCode).toBe(404);
+    expect(body.error).toBe('Task not found');
+    expect(deleteTask).not.toHaveBeenCalled();
+  });
+
+  test('should return 400 for missing task ID', async () => {
+    const event = {
+      pathParameters: {}
+    };
+
+    const response = await handler(event);
+    const body = JSON.parse(response.body);
+
+    expect(response.statusCode).toBe(400);
+    expect(body.error).toBe('Task ID is required');
+  });
+
+  test('should handle DynamoDB errors', async () => {
+    getTask.mockResolvedValue({ id: '123' });
+    deleteTask.mockRejectedValue(new Error('DynamoDB error'));
+
+    const event = {
+      pathParameters: { id: '123' }
+    };
+
+    const response = await handler(event);
+    const body = JSON.parse(response.body);
+
+    expect(response.statusCode).toBe(503);
+    expect(body.error).toBe('Service temporarily unavailable');
+  });
+});
