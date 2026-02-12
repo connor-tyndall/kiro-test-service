@@ -1,7 +1,10 @@
-const { handler } = require('../../../src/handlers/createTask');
-const { putTask } = require('../../../src/lib/dynamodb');
+import { handler } from '../../../src/handlers/createTask';
+import { putTask } from '../../../src/lib/dynamodb';
+import { APIGatewayEvent } from '../../../src/types';
 
 jest.mock('../../../src/lib/dynamodb');
+
+const mockedPutTask = putTask as jest.MockedFunction<typeof putTask>;
 
 describe('createTask handler', () => {
   const originalEnv = process.env;
@@ -17,9 +20,9 @@ describe('createTask handler', () => {
   });
 
   test('should create task with all fields', async () => {
-    putTask.mockResolvedValue({});
+    mockedPutTask.mockResolvedValue({} as never);
 
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {
         'x-api-key': 'test-api-key'
       },
@@ -47,9 +50,9 @@ describe('createTask handler', () => {
   });
 
   test('should create task with defaults', async () => {
-    putTask.mockResolvedValue({});
+    mockedPutTask.mockResolvedValue({} as never);
 
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {
         'x-api-key': 'test-api-key'
       },
@@ -69,7 +72,7 @@ describe('createTask handler', () => {
   });
 
   test('should reject missing description', async () => {
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {
         'x-api-key': 'test-api-key'
       },
@@ -86,7 +89,7 @@ describe('createTask handler', () => {
   });
 
   test('should reject invalid priority', async () => {
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {
         'x-api-key': 'test-api-key'
       },
@@ -102,7 +105,7 @@ describe('createTask handler', () => {
   });
 
   test('should reject invalid JSON', async () => {
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {
         'x-api-key': 'test-api-key'
       },
@@ -117,9 +120,9 @@ describe('createTask handler', () => {
   });
 
   test('should handle DynamoDB errors', async () => {
-    putTask.mockRejectedValue(new Error('DynamoDB error'));
+    mockedPutTask.mockRejectedValue(new Error('DynamoDB error'));
 
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {
         'x-api-key': 'test-api-key'
       },
@@ -136,7 +139,7 @@ describe('createTask handler', () => {
   });
 
   test('should return 401 for missing API key', async () => {
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {},
       body: JSON.stringify({
         description: 'Test task'
@@ -151,7 +154,7 @@ describe('createTask handler', () => {
   });
 
   test('should return 401 for invalid API key', async () => {
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {
         'x-api-key': 'wrong-key'
       },

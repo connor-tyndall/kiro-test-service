@@ -1,13 +1,14 @@
-const { error } = require('../lib/response');
-const { getTask, deleteTask } = require('../lib/dynamodb');
-const { validateApiKey } = require('../lib/auth');
+import { error } from '../lib/response';
+import { getTask, deleteTask } from '../lib/dynamodb';
+import { validateApiKey } from '../lib/auth';
+import { APIGatewayEvent, LambdaResponse } from '../types';
 
 /**
  * Lambda handler for deleting a task
- * @param {Object} event - API Gateway event
- * @returns {Promise<Object>} API Gateway response
+ * @param event - API Gateway event
+ * @returns API Gateway response
  */
-exports.handler = async (event) => {
+export const handler = async (event: APIGatewayEvent): Promise<LambdaResponse> => {
   // Validate API key
   const authError = validateApiKey(event);
   if (authError) {

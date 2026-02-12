@@ -1,4 +1,5 @@
-const { success, error, formatTask } = require('../../src/lib/response');
+import { success, error, formatTask } from '../../src/lib/response';
+import { TaskItem } from '../../src/types';
 
 describe('Response Module', () => {
   describe('success', () => {
@@ -70,7 +71,7 @@ describe('Response Module', () => {
 
   describe('formatTask', () => {
     test('should format complete task item', () => {
-      const taskItem = {
+      const taskItem: TaskItem = {
         PK: 'TASK#123',
         SK: 'TASK#123',
         id: '123',
@@ -98,21 +99,25 @@ describe('Response Module', () => {
     });
 
     test('should format task without optional fields', () => {
-      const taskItem = {
+      const taskItem: TaskItem = {
+        PK: 'TASK#123',
+        SK: 'TASK#123',
         id: '123',
         description: 'Minimal task',
+        assignee: null,
         priority: 'P2',
         status: 'open',
+        dueDate: null,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z'
       };
 
       const formatted = formatTask(taskItem);
 
-      expect(formatted.assignee).toBeNull();
-      expect(formatted.dueDate).toBeNull();
-      expect(formatted.id).toBe('123');
-      expect(formatted.description).toBe('Minimal task');
+      expect(formatted!.assignee).toBeNull();
+      expect(formatted!.dueDate).toBeNull();
+      expect(formatted!.id).toBe('123');
+      expect(formatted!.description).toBe('Minimal task');
     });
 
     test('should handle null input', () => {
@@ -126,36 +131,43 @@ describe('Response Module', () => {
     });
 
     test('should convert empty string assignee to null', () => {
-      const taskItem = {
+      const taskItem: TaskItem = {
+        PK: 'TASK#123',
+        SK: 'TASK#123',
         id: '123',
         description: 'Task',
-        assignee: '',
+        assignee: '' as unknown as null,
         priority: 'P2',
         status: 'open',
+        dueDate: null,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z'
       };
 
       const formatted = formatTask(taskItem);
 
-      expect(formatted.assignee).toBeNull();
+      expect(formatted!.assignee).toBeNull();
     });
 
     test('should preserve ISO 8601 timestamp format', () => {
       const timestamp = '2024-01-15T10:30:45.123Z';
-      const taskItem = {
+      const taskItem: TaskItem = {
+        PK: 'TASK#123',
+        SK: 'TASK#123',
         id: '123',
         description: 'Task',
+        assignee: null,
         priority: 'P2',
         status: 'open',
+        dueDate: null,
         createdAt: timestamp,
         updatedAt: timestamp
       };
 
       const formatted = formatTask(taskItem);
 
-      expect(formatted.createdAt).toBe(timestamp);
-      expect(formatted.updatedAt).toBe(timestamp);
+      expect(formatted!.createdAt).toBe(timestamp);
+      expect(formatted!.updatedAt).toBe(timestamp);
     });
   });
 });

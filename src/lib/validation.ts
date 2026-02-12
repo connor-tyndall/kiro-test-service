@@ -1,15 +1,17 @@
-const VALID_PRIORITIES = ['P0', 'P1', 'P2', 'P3', 'P4'];
-const VALID_STATUSES = ['open', 'in-progress', 'blocked', 'done'];
+import { TaskInput, ValidationResult, Priority, Status } from '../types';
+
+export const VALID_PRIORITIES: Priority[] = ['P0', 'P1', 'P2', 'P3', 'P4'];
+export const VALID_STATUSES: Status[] = ['open', 'in-progress', 'blocked', 'done'];
 const MAX_DESCRIPTION_LENGTH = 1000;
 const MAX_ASSIGNEE_LENGTH = 255;
 
 /**
  * Validates task input data
- * @param {Object} data - Task data to validate
- * @returns {Object} { valid: boolean, errors: string[] }
+ * @param data - Task data to validate
+ * @returns Object containing valid flag and array of errors
  */
-function validateTaskInput(data) {
-  const errors = [];
+export function validateTaskInput(data: TaskInput): ValidationResult {
+  const errors: string[] = [];
 
   // Validate description
   const descError = validateDescription(data.description);
@@ -57,11 +59,11 @@ function validateTaskInput(data) {
 
 /**
  * Validates priority value
- * @param {string} priority - Priority to validate
- * @returns {string|null} Error message or null if valid
+ * @param priority - Priority to validate
+ * @returns Error message or null if valid
  */
-function validatePriority(priority) {
-  if (!VALID_PRIORITIES.includes(priority)) {
+export function validatePriority(priority: string | number): string | null {
+  if (!VALID_PRIORITIES.includes(priority as Priority)) {
     return `Priority must be one of: ${VALID_PRIORITIES.join(', ')}`;
   }
   return null;
@@ -69,11 +71,11 @@ function validatePriority(priority) {
 
 /**
  * Validates status value
- * @param {string} status - Status to validate
- * @returns {string|null} Error message or null if valid
+ * @param status - Status to validate
+ * @returns Error message or null if valid
  */
-function validateStatus(status) {
-  if (!VALID_STATUSES.includes(status)) {
+export function validateStatus(status: string | number): string | null {
+  if (!VALID_STATUSES.includes(status as Status)) {
     return `Status must be one of: ${VALID_STATUSES.join(', ')}`;
   }
   return null;
@@ -81,10 +83,10 @@ function validateStatus(status) {
 
 /**
  * Validates ISO 8601 date format
- * @param {string} date - Date string to validate
- * @returns {string|null} Error message or null if valid
+ * @param date - Date string to validate
+ * @returns Error message or null if valid
  */
-function validateDateFormat(date) {
+export function validateDateFormat(date: string | number): string | null {
   if (typeof date !== 'string') {
     return 'Date must be a string';
   }
@@ -116,10 +118,10 @@ function validateDateFormat(date) {
 
 /**
  * Validates description field
- * @param {string} description - Description to validate
- * @returns {string|null} Error message or null if valid
+ * @param description - Description to validate
+ * @returns Error message or null if valid
  */
-function validateDescription(description) {
+export function validateDescription(description: string | number | undefined | null): string | null {
   if (description === undefined || description === null) {
     return 'Description is required';
   }
@@ -141,10 +143,10 @@ function validateDescription(description) {
 
 /**
  * Validates assignee field (email format)
- * @param {string} assignee - Assignee email to validate
- * @returns {string|null} Error message or null if valid
+ * @param assignee - Assignee email to validate
+ * @returns Error message or null if valid
  */
-function validateAssignee(assignee) {
+export function validateAssignee(assignee: string | number): string | null {
   if (typeof assignee !== 'string') {
     return 'Assignee must be a string';
   }
@@ -164,10 +166,10 @@ function validateAssignee(assignee) {
 
 /**
  * Validates pagination limit parameter
- * @param {string|number} limit - Limit value to validate
- * @returns {string|null} Error message or null if valid
+ * @param limit - Limit value to validate
+ * @returns Error message or null if valid
  */
-function validateLimit(limit) {
+export function validateLimit(limit: string | number | null): string | null {
   const numLimit = Number(limit);
   
   if (isNaN(numLimit)) {
@@ -188,15 +190,3 @@ function validateLimit(limit) {
   
   return null;
 }
-
-module.exports = {
-  validateTaskInput,
-  validatePriority,
-  validateStatus,
-  validateDateFormat,
-  validateDescription,
-  validateAssignee,
-  validateLimit,
-  VALID_PRIORITIES,
-  VALID_STATUSES
-};

@@ -1,17 +1,25 @@
-const { handler } = require('../../../src/handlers/listTasks');
-const {
+import { handler } from '../../../src/handlers/listTasks';
+import {
   scanTasks,
   queryTasksByAssignee,
   queryTasksByStatus,
   queryTasksByPriority
-} = require('../../../src/lib/dynamodb');
+} from '../../../src/lib/dynamodb';
+import { APIGatewayEvent, TaskItem } from '../../../src/types';
 
 jest.mock('../../../src/lib/dynamodb');
 
+const mockedScanTasks = scanTasks as jest.MockedFunction<typeof scanTasks>;
+const mockedQueryTasksByAssignee = queryTasksByAssignee as jest.MockedFunction<typeof queryTasksByAssignee>;
+const mockedQueryTasksByStatus = queryTasksByStatus as jest.MockedFunction<typeof queryTasksByStatus>;
+const mockedQueryTasksByPriority = queryTasksByPriority as jest.MockedFunction<typeof queryTasksByPriority>;
+
 describe('listTasks handler', () => {
   const originalEnv = process.env;
-  const mockTasks = [
+  const mockTasks: TaskItem[] = [
     {
+      PK: 'TASK#1',
+      SK: 'TASK#1',
       id: '1',
       description: 'Task 1',
       assignee: 'user1@example.com',
@@ -22,6 +30,8 @@ describe('listTasks handler', () => {
       updatedAt: '2024-01-01T00:00:00.000Z'
     },
     {
+      PK: 'TASK#2',
+      SK: 'TASK#2',
       id: '2',
       description: 'Task 2',
       assignee: 'user2@example.com',
@@ -44,9 +54,9 @@ describe('listTasks handler', () => {
   });
 
   test('should list all tasks without filters', async () => {
-    scanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
+    mockedScanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
 
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {
         'x-api-key': 'test-api-key'
       },
@@ -58,13 +68,13 @@ describe('listTasks handler', () => {
 
     expect(response.statusCode).toBe(200);
     expect(body.tasks).toHaveLength(2);
-    expect(scanTasks).toHaveBeenCalledWith(20, undefined);
+    expect(mockedScanTasks).toHaveBeenCalledWith(20, undefined);
   });
 
   test('should filter by assignee', async () => {
-    queryTasksByAssignee.mockResolvedValue({ items: [mockTasks[0]], nextToken: null });
+    mockedQueryTasksByAssignee.mockResolvedValue({ items: [mockTasks[0]], nextToken: null });
 
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {
         'x-api-key': 'test-api-key'
       },
@@ -79,13 +89,13 @@ describe('listTasks handler', () => {
     expect(response.statusCode).toBe(200);
     expect(body.tasks).toHaveLength(1);
     expect(body.tasks[0].assignee).toBe('user1@example.com');
-    expect(queryTasksByAssignee).toHaveBeenCalledWith('user1@example.com', 20, undefined);
+    expect(mockedQueryTasksByAssignee).toHaveBeenCalledWith('user1@example.com', 20, undefined);
   });
 
   test('should filter by status', async () => {
-    queryTasksByStatus.mockResolvedValue({ items: [mockTasks[1]], nextToken: null });
+    mockedQueryTasksByStatus.mockResolvedValue({ items: [mockTasks[1]], nextToken: null });
 
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {
         'x-api-key': 'test-api-key'
       },
@@ -103,9 +113,9 @@ describe('listTasks handler', () => {
   });
 
   test('should filter by priority', async () => {
-    queryTasksByPriority.mockResolvedValue({ items: [mockTasks[0]], nextToken: null });
+    mockedQueryTasksByPriority.mockResolvedValue({ items: [mockTasks[0]], nextToken: null });
 
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {
         'x-api-key': 'test-api-key'
       },
@@ -123,9 +133,9 @@ describe('listTasks handler', () => {
   });
 
   test('should filter by due date', async () => {
-    scanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
+    mockedScanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
 
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {
         'x-api-key': 'test-api-key'
       },
@@ -143,9 +153,9 @@ describe('listTasks handler', () => {
   });
 
   test('should apply multiple filters', async () => {
-    queryTasksByAssignee.mockResolvedValue({ items: mockTasks, nextToken: null });
+    mockedQueryTasksByAssignee.mockResolvedValue({ items: mockTasks, nextToken: null });
 
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {
         'x-api-key': 'test-api-key'
       },
@@ -165,9 +175,9 @@ describe('listTasks handler', () => {
   });
 
   test('should return empty array when no matches', async () => {
-    scanTasks.mockResolvedValue({ items: [], nextToken: null });
+    mockedScanTasks.mockResolvedValue({ items: [], nextToken: null });
 
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {
         'x-api-key': 'test-api-key'
       },
@@ -182,7 +192,7 @@ describe('listTasks handler', () => {
   });
 
   test('should reject invalid priority', async () => {
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {
         'x-api-key': 'test-api-key'
       },
@@ -197,7 +207,7 @@ describe('listTasks handler', () => {
   });
 
   test('should reject invalid status', async () => {
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {
         'x-api-key': 'test-api-key'
       },
@@ -212,9 +222,9 @@ describe('listTasks handler', () => {
   });
 
   test('should handle DynamoDB errors', async () => {
-    scanTasks.mockRejectedValue(new Error('DynamoDB error'));
+    mockedScanTasks.mockRejectedValue(new Error('DynamoDB error'));
 
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {
         'x-api-key': 'test-api-key'
       },
@@ -229,7 +239,7 @@ describe('listTasks handler', () => {
   });
 
   test('should return 401 for missing API key', async () => {
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {},
       queryStringParameters: null
     };
@@ -242,7 +252,7 @@ describe('listTasks handler', () => {
   });
 
   test('should return 401 for invalid API key', async () => {
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {
         'x-api-key': 'wrong-key'
       },
@@ -258,9 +268,9 @@ describe('listTasks handler', () => {
 
   describe('Pagination', () => {
     test('should use default limit of 20', async () => {
-      scanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
+      mockedScanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
 
-      const event = {
+      const event: APIGatewayEvent = {
         headers: {
           'x-api-key': 'test-api-key'
         },
@@ -269,13 +279,13 @@ describe('listTasks handler', () => {
 
       await handler(event);
 
-      expect(scanTasks).toHaveBeenCalledWith(20, undefined);
+      expect(mockedScanTasks).toHaveBeenCalledWith(20, undefined);
     });
 
     test('should accept custom limit', async () => {
-      scanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
+      mockedScanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
 
-      const event = {
+      const event: APIGatewayEvent = {
         headers: {
           'x-api-key': 'test-api-key'
         },
@@ -286,14 +296,14 @@ describe('listTasks handler', () => {
 
       await handler(event);
 
-      expect(scanTasks).toHaveBeenCalledWith(50, undefined);
+      expect(mockedScanTasks).toHaveBeenCalledWith(50, undefined);
     });
 
     test('should pass nextToken to DynamoDB', async () => {
       const token = 'test-token';
-      scanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
+      mockedScanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
 
-      const event = {
+      const event: APIGatewayEvent = {
         headers: {
           'x-api-key': 'test-api-key'
         },
@@ -304,14 +314,14 @@ describe('listTasks handler', () => {
 
       await handler(event);
 
-      expect(scanTasks).toHaveBeenCalledWith(20, token);
+      expect(mockedScanTasks).toHaveBeenCalledWith(20, token);
     });
 
     test('should return nextToken when more results available', async () => {
       const nextToken = 'next-page-token';
-      scanTasks.mockResolvedValue({ items: mockTasks, nextToken });
+      mockedScanTasks.mockResolvedValue({ items: mockTasks, nextToken });
 
-      const event = {
+      const event: APIGatewayEvent = {
         headers: {
           'x-api-key': 'test-api-key'
         },
@@ -325,9 +335,9 @@ describe('listTasks handler', () => {
     });
 
     test('should not return nextToken when no more results', async () => {
-      scanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
+      mockedScanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
 
-      const event = {
+      const event: APIGatewayEvent = {
         headers: {
           'x-api-key': 'test-api-key'
         },
@@ -341,7 +351,7 @@ describe('listTasks handler', () => {
     });
 
     test('should reject limit below minimum', async () => {
-      const event = {
+      const event: APIGatewayEvent = {
         headers: {
           'x-api-key': 'test-api-key'
         },
@@ -358,7 +368,7 @@ describe('listTasks handler', () => {
     });
 
     test('should reject limit above maximum', async () => {
-      const event = {
+      const event: APIGatewayEvent = {
         headers: {
           'x-api-key': 'test-api-key'
         },
@@ -375,7 +385,7 @@ describe('listTasks handler', () => {
     });
 
     test('should reject non-numeric limit', async () => {
-      const event = {
+      const event: APIGatewayEvent = {
         headers: {
           'x-api-key': 'test-api-key'
         },
@@ -393,9 +403,9 @@ describe('listTasks handler', () => {
 
     test('should work with pagination and filters', async () => {
       const nextToken = 'next-page-token';
-      queryTasksByAssignee.mockResolvedValue({ items: [mockTasks[0]], nextToken });
+      mockedQueryTasksByAssignee.mockResolvedValue({ items: [mockTasks[0]], nextToken });
 
-      const event = {
+      const event: APIGatewayEvent = {
         headers: {
           'x-api-key': 'test-api-key'
         },
@@ -412,13 +422,13 @@ describe('listTasks handler', () => {
       expect(response.statusCode).toBe(200);
       expect(body.tasks).toHaveLength(1);
       expect(body.nextToken).toBe(nextToken);
-      expect(queryTasksByAssignee).toHaveBeenCalledWith('user1@example.com', 10, 'prev-token');
+      expect(mockedQueryTasksByAssignee).toHaveBeenCalledWith('user1@example.com', 10, 'prev-token');
     });
   });
 
   describe('Edge Cases', () => {
     test('should handle decimal limit', async () => {
-      const event = {
+      const event: APIGatewayEvent = {
         headers: {
           'x-api-key': 'test-api-key'
         },

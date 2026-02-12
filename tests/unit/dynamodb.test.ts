@@ -9,14 +9,14 @@ jest.mock('@aws-sdk/lib-dynamodb', () => ({
       send: mockSend
     }))
   },
-  PutCommand: jest.fn((params) => params),
-  GetCommand: jest.fn((params) => params),
-  DeleteCommand: jest.fn((params) => params),
-  ScanCommand: jest.fn((params) => params),
-  QueryCommand: jest.fn((params) => params)
+  PutCommand: jest.fn((params: unknown) => params),
+  GetCommand: jest.fn((params: unknown) => params),
+  DeleteCommand: jest.fn((params: unknown) => params),
+  ScanCommand: jest.fn((params: unknown) => params),
+  QueryCommand: jest.fn((params: unknown) => params)
 }));
 
-const {
+import {
   putTask,
   getTask,
   deleteTask,
@@ -24,7 +24,8 @@ const {
   queryTasksByAssignee,
   queryTasksByStatus,
   queryTasksByPriority
-} = require('../../src/lib/dynamodb');
+} from '../../src/lib/dynamodb';
+import { Task } from '../../src/types';
 
 describe('DynamoDB Module', () => {
   beforeEach(() => {
@@ -35,11 +36,13 @@ describe('DynamoDB Module', () => {
     test('should put task to DynamoDB', async () => {
       mockSend.mockResolvedValue({});
 
-      const task = {
+      const task: Task = {
         id: '123',
         description: 'Test task',
+        assignee: null,
         priority: 'P1',
         status: 'open',
+        dueDate: null,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z'
       };
@@ -53,7 +56,16 @@ describe('DynamoDB Module', () => {
     test('should handle DynamoDB errors', async () => {
       mockSend.mockRejectedValue(new Error('DynamoDB error'));
 
-      const task = { id: '123', description: 'Test' };
+      const task: Task = {
+        id: '123',
+        description: 'Test',
+        assignee: null,
+        priority: 'P1',
+        status: 'open',
+        dueDate: null,
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z'
+      };
 
       await expect(putTask(task)).rejects.toThrow('Service temporarily unavailable');
     });

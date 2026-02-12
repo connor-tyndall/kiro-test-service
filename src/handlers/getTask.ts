@@ -1,14 +1,14 @@
-const { error, success } = require('../lib/response');
-const { getTask } = require('../lib/dynamodb');
-const { formatTask } = require('../lib/response');
-const { validateApiKey } = require('../lib/auth');
+import { error, success, formatTask } from '../lib/response';
+import { getTask } from '../lib/dynamodb';
+import { validateApiKey } from '../lib/auth';
+import { APIGatewayEvent, LambdaResponse } from '../types';
 
 /**
  * Lambda handler for retrieving a task by ID
- * @param {Object} event - API Gateway event
- * @returns {Promise<Object>} API Gateway response
+ * @param event - API Gateway event
+ * @returns API Gateway response
  */
-exports.handler = async (event) => {
+export const handler = async (event: APIGatewayEvent): Promise<LambdaResponse> => {
   // Validate API key
   const authError = validateApiKey(event);
   if (authError) {
@@ -32,7 +32,7 @@ exports.handler = async (event) => {
 
     // Format and return task
     const formattedTask = formatTask(task);
-    return success(200, formattedTask);
+    return success(200, formattedTask!);
   } catch (err) {
     console.error('Error retrieving task:', err);
     return error(503, 'Service temporarily unavailable');

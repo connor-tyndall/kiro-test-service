@@ -1,10 +1,12 @@
+import { LambdaResponse, TaskItem, FormattedTask } from '../types';
+
 /**
  * Creates a success response
- * @param {number} statusCode - HTTP status code
- * @param {Object} body - Response body
- * @returns {Object} Lambda response object
+ * @param statusCode - HTTP status code
+ * @param body - Response body
+ * @returns Lambda response object
  */
-function success(statusCode, body) {
+export function success(statusCode: number, body: object): LambdaResponse {
   return {
     statusCode,
     headers: {
@@ -16,11 +18,11 @@ function success(statusCode, body) {
 
 /**
  * Creates an error response
- * @param {number} statusCode - HTTP status code
- * @param {string} message - Error message
- * @returns {Object} Lambda response object
+ * @param statusCode - HTTP status code
+ * @param message - Error message
+ * @returns Lambda response object
  */
-function error(statusCode, message) {
+export function error(statusCode: number, message: string): LambdaResponse {
   return {
     statusCode,
     headers: {
@@ -34,10 +36,10 @@ function error(statusCode, message) {
 
 /**
  * Formats a DynamoDB item to API task format
- * @param {Object} taskItem - DynamoDB item
- * @returns {Object} Formatted task object
+ * @param taskItem - DynamoDB item
+ * @returns Formatted task object
  */
-function formatTask(taskItem) {
+export function formatTask(taskItem: TaskItem | null | undefined): FormattedTask | null {
   if (!taskItem) {
     return null;
   }
@@ -53,9 +55,3 @@ function formatTask(taskItem) {
     updatedAt: taskItem.updatedAt
   };
 }
-
-module.exports = {
-  success,
-  error,
-  formatTask
-};

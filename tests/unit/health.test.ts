@@ -1,4 +1,4 @@
-const { handler } = require('../../src/handlers/health');
+import { handler } from '../../src/handlers/health';
 
 describe('Health Handler', () => {
   it('should return healthy status', async () => {

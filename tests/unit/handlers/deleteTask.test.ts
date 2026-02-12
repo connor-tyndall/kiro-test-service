@@ -1,9 +1,13 @@
-const { handler } = require('../../../src/handlers/getTask');
-const { getTask } = require('../../../src/lib/dynamodb');
+import { handler } from '../../../src/handlers/deleteTask';
+import { getTask, deleteTask } from '../../../src/lib/dynamodb';
+import { APIGatewayEvent, TaskItem } from '../../../src/types';
 
 jest.mock('../../../src/lib/dynamodb');
 
-describe('getTask handler', () => {
+const mockedGetTask = getTask as jest.MockedFunction<typeof getTask>;
+const mockedDeleteTask = deleteTask as jest.MockedFunction<typeof deleteTask>;
+
+describe('deleteTask handler', () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
@@ -16,21 +20,24 @@ describe('getTask handler', () => {
     process.env = originalEnv;
   });
 
-  test('should retrieve existing task', async () => {
-    const mockTask = {
+  test('should delete existing task', async () => {
+    const mockTask: TaskItem = {
+      PK: 'TASK#123',
+      SK: 'TASK#123',
       id: '123',
       description: 'Test task',
-      assignee: 'user@example.com',
-      priority: 'P1',
+      assignee: null,
+      priority: 'P2',
       status: 'open',
-      dueDate: '2024-12-31',
+      dueDate: null,
       createdAt: '2024-01-01T00:00:00.000Z',
       updatedAt: '2024-01-01T00:00:00.000Z'
     };
 
-    getTask.mockResolvedValue(mockTask);
+    mockedGetTask.mockResolvedValue(mockTask);
+    mockedDeleteTask.mockResolvedValue();
 
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {
         'x-api-key': 'test-api-key'
       },
@@ -38,17 +45,16 @@ describe('getTask handler', () => {
     };
 
     const response = await handler(event);
-    const body = JSON.parse(response.body);
 
-    expect(response.statusCode).toBe(200);
-    expect(body.id).toBe('123');
-    expect(body.description).toBe('Test task');
+    expect(response.statusCode).toBe(204);
+    expect(response.body).toBe('');
+    expect(mockedDeleteTask).toHaveBeenCalledWith('123');
   });
 
   test('should return 404 for non-existent task', async () => {
-    getTask.mockResolvedValue(null);
+    mockedGetTask.mockResolvedValue(null);
 
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {
         'x-api-key': 'test-api-key'
       },
@@ -60,10 +66,11 @@ describe('getTask handler', () => {
 
     expect(response.statusCode).toBe(404);
     expect(body.error).toBe('Task not found');
+    expect(mockedDeleteTask).not.toHaveBeenCalled();
   });
 
   test('should return 400 for missing task ID', async () => {
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {
         'x-api-key': 'test-api-key'
       },
@@ -78,9 +85,21 @@ describe('getTask handler', () => {
   });
 
   test('should handle DynamoDB errors', async () => {
-    getTask.mockRejectedValue(new Error('DynamoDB error'));
+    mockedGetTask.mockResolvedValue({
+      PK: 'TASK#123',
+      SK: 'TASK#123',
+      id: '123',
+      description: 'Test task',
+      assignee: null,
+      priority: 'P2',
+      status: 'open',
+      dueDate: null,
+      createdAt: '2024-01-01T00:00:00.000Z',
+      updatedAt: '2024-01-01T00:00:00.000Z'
+    });
+    mockedDeleteTask.mockRejectedValue(new Error('DynamoDB error'));
 
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {
         'x-api-key': 'test-api-key'
       },
@@ -95,7 +114,7 @@ describe('getTask handler', () => {
   });
 
   test('should return 401 for missing API key', async () => {
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {},
       pathParameters: { id: '123' }
     };
@@ -108,7 +127,7 @@ describe('getTask handler', () => {
   });
 
   test('should return 401 for invalid API key', async () => {
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {
         'x-api-key': 'wrong-key'
       },

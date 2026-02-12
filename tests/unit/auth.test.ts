@@ -1,4 +1,5 @@
-const { validateApiKey } = require('../../src/lib/auth');
+import { validateApiKey } from '../../src/lib/auth';
+import { APIGatewayEvent } from '../../src/types';
 
 describe('Auth Module', () => {
   const originalEnv = process.env;
@@ -14,7 +15,7 @@ describe('Auth Module', () => {
 
   describe('validateApiKey', () => {
     test('should return null for valid API key in lowercase header', () => {
-      const event = {
+      const event: APIGatewayEvent = {
         headers: {
           'x-api-key': 'test-api-key-12345'
         }
@@ -24,7 +25,7 @@ describe('Auth Module', () => {
     });
 
     test('should return null for valid API key in mixed case header', () => {
-      const event = {
+      const event: APIGatewayEvent = {
         headers: {
           'X-Api-Key': 'test-api-key-12345'
         }
@@ -34,74 +35,74 @@ describe('Auth Module', () => {
     });
 
     test('should return 401 for missing API key', () => {
-      const event = {
+      const event: APIGatewayEvent = {
         headers: {}
       };
       const result = validateApiKey(event);
-      expect(result.statusCode).toBe(401);
-      expect(JSON.parse(result.body).error).toBe('Missing API key');
+      expect(result!.statusCode).toBe(401);
+      expect(JSON.parse(result!.body).error).toBe('Missing API key');
     });
 
     test('should return 401 for missing headers object', () => {
-      const event = {};
+      const event: APIGatewayEvent = {};
       const result = validateApiKey(event);
-      expect(result.statusCode).toBe(401);
-      expect(JSON.parse(result.body).error).toBe('Missing API key');
+      expect(result!.statusCode).toBe(401);
+      expect(JSON.parse(result!.body).error).toBe('Missing API key');
     });
 
     test('should return 401 for invalid API key', () => {
-      const event = {
+      const event: APIGatewayEvent = {
         headers: {
           'x-api-key': 'wrong-key'
         }
       };
       const result = validateApiKey(event);
-      expect(result.statusCode).toBe(401);
-      expect(JSON.parse(result.body).error).toBe('Invalid API key');
+      expect(result!.statusCode).toBe(401);
+      expect(JSON.parse(result!.body).error).toBe('Invalid API key');
     });
 
     test('should return 401 for empty API key', () => {
-      const event = {
+      const event: APIGatewayEvent = {
         headers: {
           'x-api-key': ''
         }
       };
       const result = validateApiKey(event);
-      expect(result.statusCode).toBe(401);
-      expect(JSON.parse(result.body).error).toBe('Missing API key');
+      expect(result!.statusCode).toBe(401);
+      expect(JSON.parse(result!.body).error).toBe('Missing API key');
     });
 
     test('should return 500 if API_KEY environment variable is not set', () => {
       delete process.env.API_KEY;
-      const event = {
+      const event: APIGatewayEvent = {
         headers: {
           'x-api-key': 'some-key'
         }
       };
       const result = validateApiKey(event);
-      expect(result.statusCode).toBe(500);
-      expect(JSON.parse(result.body).error).toBe('Internal server error');
+      expect(result!.statusCode).toBe(500);
+      expect(JSON.parse(result!.body).error).toBe('Internal server error');
     });
 
     test('should return 500 if API_KEY environment variable is empty', () => {
       process.env.API_KEY = '';
-      const event = {
+      const event: APIGatewayEvent = {
         headers: {
           'x-api-key': 'some-key'
         }
       };
       const result = validateApiKey(event);
-      expect(result.statusCode).toBe(500);
-      expect(JSON.parse(result.body).error).toBe('Internal server error');
+      expect(result!.statusCode).toBe(500);
+      expect(JSON.parse(result!.body).error).toBe('Internal server error');
     });
 
     test('should handle null headers', () => {
-      const event = {
+      const event: APIGatewayEvent = {
         headers: null
       };
       const result = validateApiKey(event);
-      expect(result.statusCode).toBe(401);
-      expect(JSON.parse(result.body).error).toBe('Missing API key');
+      expect(result!.statusCode).toBe(401);
+      expect(JSON.parse(result!.body).error).toBe('Missing API key');
     });
   });
 });

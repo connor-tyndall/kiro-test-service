@@ -1,11 +1,17 @@
-const { handler } = require('../../../src/handlers/updateTask');
-const { getTask, putTask } = require('../../../src/lib/dynamodb');
+import { handler } from '../../../src/handlers/updateTask';
+import { getTask, putTask } from '../../../src/lib/dynamodb';
+import { APIGatewayEvent, TaskItem } from '../../../src/types';
 
 jest.mock('../../../src/lib/dynamodb');
 
+const mockedGetTask = getTask as jest.MockedFunction<typeof getTask>;
+const mockedPutTask = putTask as jest.MockedFunction<typeof putTask>;
+
 describe('updateTask handler', () => {
   const originalEnv = process.env;
-  const mockExistingTask = {
+  const mockExistingTask: TaskItem = {
+    PK: 'TASK#123',
+    SK: 'TASK#123',
     id: '123',
     description: 'Original task',
     assignee: 'user1@example.com',
@@ -27,10 +33,10 @@ describe('updateTask handler', () => {
   });
 
   test('should update task fields', async () => {
-    getTask.mockResolvedValue(mockExistingTask);
-    putTask.mockResolvedValue({});
+    mockedGetTask.mockResolvedValue(mockExistingTask);
+    mockedPutTask.mockResolvedValue({} as never);
 
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {
         'x-api-key': 'test-api-key'
       },
@@ -51,10 +57,10 @@ describe('updateTask handler', () => {
   });
 
   test('should preserve immutable fields', async () => {
-    getTask.mockResolvedValue(mockExistingTask);
-    putTask.mockResolvedValue({});
+    mockedGetTask.mockResolvedValue(mockExistingTask);
+    mockedPutTask.mockResolvedValue({} as never);
 
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {
         'x-api-key': 'test-api-key'
       },
@@ -74,10 +80,10 @@ describe('updateTask handler', () => {
   });
 
   test('should update updatedAt timestamp', async () => {
-    getTask.mockResolvedValue(mockExistingTask);
-    putTask.mockResolvedValue({});
+    mockedGetTask.mockResolvedValue(mockExistingTask);
+    mockedPutTask.mockResolvedValue({} as never);
 
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {
         'x-api-key': 'test-api-key'
       },
@@ -94,9 +100,9 @@ describe('updateTask handler', () => {
   });
 
   test('should return 404 for non-existent task', async () => {
-    getTask.mockResolvedValue(null);
+    mockedGetTask.mockResolvedValue(null);
 
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {
         'x-api-key': 'test-api-key'
       },
@@ -112,9 +118,9 @@ describe('updateTask handler', () => {
   });
 
   test('should reject invalid updates', async () => {
-    getTask.mockResolvedValue(mockExistingTask);
+    mockedGetTask.mockResolvedValue(mockExistingTask);
 
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {
         'x-api-key': 'test-api-key'
       },
@@ -130,10 +136,10 @@ describe('updateTask handler', () => {
   });
 
   test('should handle assignee clearing', async () => {
-    getTask.mockResolvedValue(mockExistingTask);
-    putTask.mockResolvedValue({});
+    mockedGetTask.mockResolvedValue(mockExistingTask);
+    mockedPutTask.mockResolvedValue({} as never);
 
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {
         'x-api-key': 'test-api-key'
       },
@@ -151,7 +157,7 @@ describe('updateTask handler', () => {
   });
 
   test('should return 401 for missing API key', async () => {
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {},
       pathParameters: { id: '123' },
       body: JSON.stringify({ description: 'Updated' })
@@ -165,7 +171,7 @@ describe('updateTask handler', () => {
   });
 
   test('should return 401 for invalid API key', async () => {
-    const event = {
+    const event: APIGatewayEvent = {
       headers: {
         'x-api-key': 'wrong-key'
       },

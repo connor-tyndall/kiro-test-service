@@ -1,4 +1,4 @@
-const {
+import {
   validateTaskInput,
   validatePriority,
   validateStatus,
@@ -8,7 +8,7 @@ const {
   validateLimit,
   VALID_PRIORITIES,
   VALID_STATUSES
-} = require('../../src/lib/validation');
+} from '../../src/lib/validation';
 
 describe('Validation Module', () => {
   describe('validateDescription', () => {
@@ -255,7 +255,7 @@ describe('Validation Module', () => {
     test('should reject non-string assignee', () => {
       const result = validateTaskInput({
         description: 'Valid task',
-        assignee: 123
+        assignee: 123 as unknown as string
       });
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('Assignee must be a string');

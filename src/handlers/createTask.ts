@@ -1,15 +1,16 @@
-const { v4: uuidv4 } = require('uuid');
-const { validateTaskInput } = require('../lib/validation');
-const { success, error } = require('../lib/response');
-const { putTask } = require('../lib/dynamodb');
-const { validateApiKey } = require('../lib/auth');
+import { v4 as uuidv4 } from 'uuid';
+import { validateTaskInput } from '../lib/validation';
+import { success, error } from '../lib/response';
+import { putTask } from '../lib/dynamodb';
+import { validateApiKey } from '../lib/auth';
+import { APIGatewayEvent, LambdaResponse, Task, TaskInput, Priority, Status } from '../types';
 
 /**
  * Lambda handler for creating a new task
- * @param {Object} event - API Gateway event
- * @returns {Promise<Object>} API Gateway response
+ * @param event - API Gateway event
+ * @returns API Gateway response
  */
-exports.handler = async (event) => {
+export const handler = async (event: APIGatewayEvent): Promise<LambdaResponse> => {
   // Validate API key
   const authError = validateApiKey(event);
   if (authError) {
@@ -18,10 +19,10 @@ exports.handler = async (event) => {
 
   try {
     // Parse request body
-    let requestBody;
+    let requestBody: TaskInput;
     try {
-      requestBody = JSON.parse(event.body || '{}');
-    } catch (parseError) {
+      requestBody = JSON.parse(event.body || '{}') as TaskInput;
+    } catch (_parseError) {
       return error(400, 'Invalid JSON in request body');
     }
 
@@ -33,12 +34,12 @@ exports.handler = async (event) => {
 
     // Generate unique ID and timestamps
     const now = new Date().toISOString();
-    const task = {
+    const task: Task = {
       id: uuidv4(),
-      description: requestBody.description,
+      description: requestBody.description!,
       assignee: requestBody.assignee || null,
-      priority: requestBody.priority || 'P2',
-      status: requestBody.status || 'open',
+      priority: (requestBody.priority as Priority) || 'P2',
+      status: (requestBody.status as Status) || 'open',
       dueDate: requestBody.dueDate || null,
       createdAt: now,
       updatedAt: now

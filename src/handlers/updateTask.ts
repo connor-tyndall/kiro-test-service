@@ -1,14 +1,15 @@
-const { validateTaskInput } = require('../lib/validation');
-const { error, success, formatTask } = require('../lib/response');
-const { getTask, putTask } = require('../lib/dynamodb');
-const { validateApiKey } = require('../lib/auth');
+import { validateTaskInput } from '../lib/validation';
+import { error, success, formatTask } from '../lib/response';
+import { getTask, putTask } from '../lib/dynamodb';
+import { validateApiKey } from '../lib/auth';
+import { APIGatewayEvent, LambdaResponse, Task, TaskInput, TaskItem, Priority, Status } from '../types';
 
 /**
  * Lambda handler for updating a task
- * @param {Object} event - API Gateway event
- * @returns {Promise<Object>} API Gateway response
+ * @param event - API Gateway event
+ * @returns API Gateway response
  */
-exports.handler = async (event) => {
+export const handler = async (event: APIGatewayEvent): Promise<LambdaResponse> => {
   // Validate API key
   const authError = validateApiKey(event);
   if (authError) {
@@ -24,10 +25,10 @@ exports.handler = async (event) => {
     }
 
     // Parse request body
-    let requestBody;
+    let requestBody: TaskInput;
     try {
-      requestBody = JSON.parse(event.body || '{}');
-    } catch (parseError) {
+      requestBody = JSON.parse(event.body || '{}') as TaskInput;
+    } catch (_parseError) {
       return error(400, 'Invalid JSON in request body');
     }
 
@@ -38,7 +39,7 @@ exports.handler = async (event) => {
     }
 
     // Validate update data (description not required for updates)
-    const dataToValidate = {
+    const dataToValidate: TaskInput = {
       description: requestBody.description !== undefined ? requestBody.description : existingTask.description,
       ...requestBody
     };
@@ -49,7 +50,7 @@ exports.handler = async (event) => {
     }
 
     // Build updated task (preserve immutable fields)
-    const updatedTask = {
+    const updatedTask: Task = {
       ...existingTask,
       id: existingTask.id, // Immutable
       createdAt: existingTask.createdAt, // Immutable
@@ -58,16 +59,16 @@ exports.handler = async (event) => {
 
     // Apply updates for mutable fields only
     if (requestBody.description !== undefined) {
-      updatedTask.description = requestBody.description;
+      updatedTask.description = requestBody.description as string;
     }
     if (requestBody.assignee !== undefined) {
       updatedTask.assignee = requestBody.assignee;
     }
     if (requestBody.priority !== undefined) {
-      updatedTask.priority = requestBody.priority;
+      updatedTask.priority = requestBody.priority as Priority;
     }
     if (requestBody.status !== undefined) {
-      updatedTask.status = requestBody.status;
+      updatedTask.status = requestBody.status as Status;
     }
     if (requestBody.dueDate !== undefined) {
       updatedTask.dueDate = requestBody.dueDate;
@@ -77,8 +78,8 @@ exports.handler = async (event) => {
     await putTask(updatedTask);
 
     // Return updated task
-    const formattedTask = formatTask(updatedTask);
-    return success(200, formattedTask);
+    const formattedTask = formatTask(updatedTask as TaskItem);
+    return success(200, formattedTask!);
   } catch (err) {
     console.error('Error updating task:', err);
     return error(503, 'Service temporarily unavailable');

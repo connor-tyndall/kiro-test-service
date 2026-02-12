@@ -1,11 +1,12 @@
-const { error } = require('./response');
+import { error } from './response';
+import { APIGatewayEvent, LambdaResponse } from '../types';
 
 /**
  * Validates API key from request headers
- * @param {Object} event - Lambda event object
- * @returns {Object|null} Error response if invalid, null if valid
+ * @param event - Lambda event object
+ * @returns Error response if invalid, null if valid
  */
-function validateApiKey(event) {
+export function validateApiKey(event: APIGatewayEvent): LambdaResponse | null {
   const apiKey = event.headers?.['x-api-key'] || event.headers?.['X-Api-Key'];
   const expectedKey = process.env.API_KEY;
 
@@ -24,7 +25,3 @@ function validateApiKey(event) {
 
   return null;
 }
-
-module.exports = {
-  validateApiKey
-};
