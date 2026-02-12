@@ -105,4 +105,26 @@ describe('Auth Module', () => {
       expect(JSON.parse(result!.body).error).toBe('Missing API key');
     });
   });
+
+  describe('Edge Cases', () => {
+    test('should handle undefined headers object', () => {
+      const event: APIGatewayEvent = {
+        headers: undefined
+      };
+      const result = validateApiKey(event);
+      expect(result!.statusCode).toBe(401);
+      expect(JSON.parse(result!.body).error).toBe('Missing API key');
+    });
+
+    test('should be case-sensitive for API key value', () => {
+      const event: APIGatewayEvent = {
+        headers: {
+          'x-api-key': 'TEST-API-KEY-12345'
+        }
+      };
+      const result = validateApiKey(event);
+      expect(result!.statusCode).toBe(401);
+      expect(JSON.parse(result!.body).error).toBe('Invalid API key');
+    });
+  });
 });

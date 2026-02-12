@@ -170,4 +170,21 @@ describe('Response Module', () => {
       expect(formatted!.updatedAt).toBe(timestamp);
     });
   });
+
+  describe('Edge Cases', () => {
+    test('should handle deeply nested body in success response', () => {
+      const body = { data: { nested: { value: 'test' } } };
+      const response = success(200, body);
+
+      expect(response.statusCode).toBe(200);
+      expect(JSON.parse(response.body)).toEqual(body);
+    });
+
+    test('should handle special characters in error message', () => {
+      const message = 'Error: Special chars <>&"\'';
+      const response = error(400, message);
+
+      expect(JSON.parse(response.body).error).toBe(message);
+    });
+  });
 });

@@ -35,6 +35,6 @@ export const handler = async (event: APIGatewayEvent): Promise<LambdaResponse> =
     return success(200, formattedTask!);
   } catch (err) {
     console.error('Error retrieving task:', err);
-    return error(503, 'Service temporarily unavailable');
+    return error(500, 'Internal server error: retrieving task');
   }
 };

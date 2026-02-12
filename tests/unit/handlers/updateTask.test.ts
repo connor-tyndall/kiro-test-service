@@ -185,4 +185,42 @@ describe('updateTask handler', () => {
     expect(response.statusCode).toBe(401);
     expect(body.error).toBe('Invalid API key');
   });
+
+  describe('Edge Cases', () => {
+    test('should handle null pathParameters', async () => {
+      const event: APIGatewayEvent = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: JSON.stringify({ description: 'Updated' })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toBe('Task ID is required');
+    });
+
+    test('should handle DynamoDB errors', async () => {
+      mockedGetTask.mockResolvedValue(mockExistingTask);
+      mockedPutTask.mockRejectedValue(new Error('DynamoDB error'));
+
+      const event: APIGatewayEvent = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        pathParameters: { id: '123' },
+        body: JSON.stringify({
+          description: 'Updated'
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(500);
+      expect(body.error).toBe('Internal server error: updating task');
+    });
+  });
 });
