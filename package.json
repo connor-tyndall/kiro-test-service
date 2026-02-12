@@ -11,7 +11,13 @@
     "clean": "rm -rf dist",
     "prebuild": "npm run clean"
   },
-  "keywords": ["task", "api", "serverless", "aws", "lambda"],
+  "keywords": [
+    "task",
+    "api",
+    "serverless",
+    "aws",
+    "lambda"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
@@ -26,6 +32,7 @@
     "fast-check": "^3.23.1",
     "jest": "^29.7.0",
     "ts-jest": "^29.2.5",
+    "ts-node": "^10.9.2",
     "typescript": "^5.7.2"
   }
 }
