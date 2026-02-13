@@ -7,11 +7,21 @@ const {
   queryTasksByPriority 
 } = require('../lib/dynamodb');
 const { validateApiKey } = require('../lib/auth');
+const { INTERNAL_ERROR_LISTING_TASKS } = require('../lib/errors');
+
+/**
+ * @typedef {import('../lib/validation').TaskStatus} TaskStatus
+ * @typedef {import('../lib/validation').TaskPriority} TaskPriority
+ */
 
 /**
  * Lambda handler for listing and filtering tasks
  * @param {Object} event - API Gateway event
  * @returns {Promise<Object>} API Gateway response
+ *   - 200: { tasks: Array<{ id: string, description: string, assignee: string|null, priority: TaskPriority, status: TaskStatus, dueDate: string|null, createdAt: string, updatedAt: string }>, nextToken?: string }
+ *   - 400: { error: string } - Invalid filter parameters (priority, status, dueDateBefore, limit, nextToken)
+ *   - 401: { error: string } - Missing or invalid API key
+ *   - 500: { error: string } - Internal server error
  */
 exports.handler = async (event) => {
   // Validate API key
@@ -66,9 +76,9 @@ exports.handler = async (event) => {
       if (assignee) {
         result = await queryTasksByAssignee(assignee, parsedLimit, nextToken);
       } else if (status) {
-        result = await queryTasksByStatus(status, parsedLimit, nextToken);
+        result = await queryTasksByStatus(/** @type {TaskStatus} */ (status), parsedLimit, nextToken);
       } else if (priority) {
-        result = await queryTasksByPriority(priority, parsedLimit, nextToken);
+        result = await queryTasksByPriority(/** @type {TaskPriority} */ (priority), parsedLimit, nextToken);
       }
     } else {
       // Multiple filters - use most selective GSI and filter in code
@@ -84,7 +94,7 @@ exports.handler = async (event) => {
           result.items = result.items.filter(task => task.priority === priority);
         }
       } else if (status) {
-        result = await queryTasksByStatus(status, parsedLimit, nextToken);
+        result = await queryTasksByStatus(/** @type {TaskStatus} */ (status), parsedLimit, nextToken);
         
         // Apply priority filter in code
         if (priority) {
@@ -92,7 +102,7 @@ exports.handler = async (event) => {
         }
       } else {
         // Only priority filter remains
-        result = await queryTasksByPriority(priority, parsedLimit, nextToken);
+        result = await queryTasksByPriority(/** @type {TaskPriority} */ (priority), parsedLimit, nextToken);
       }
     }
 
@@ -118,6 +128,6 @@ exports.handler = async (event) => {
     return success(200, responseBody);
   } catch (err) {
     console.error('Error listing tasks:', err);
-    return error(500, 'Internal server error: listing tasks');
+    return error(500, INTERNAL_ERROR_LISTING_TASKS);
   }
 };

@@ -1,3 +1,11 @@
+/**
+ * @typedef {'open' | 'in-progress' | 'blocked' | 'done'} TaskStatus
+ */
+
+/**
+ * @typedef {'P0' | 'P1' | 'P2' | 'P3' | 'P4'} TaskPriority
+ */
+
 const VALID_PRIORITIES = ['P0', 'P1', 'P2', 'P3', 'P4'];
 const VALID_STATUSES = ['open', 'in-progress', 'blocked', 'done'];
 const MAX_DESCRIPTION_LENGTH = 1000;
