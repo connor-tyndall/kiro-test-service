@@ -1,7 +1,8 @@
-const { error, success } = require('../lib/response');
+const { error, success, rateLimitExceeded } = require('../lib/response');
 const { getTask } = require('../lib/dynamodb');
 const { formatTask } = require('../lib/response');
 const { validateApiKey } = require('../lib/auth');
+const { checkRateLimit } = require('../lib/rateLimiter');
 
 /**
  * Lambda handler for retrieving a task by ID
@@ -13,6 +14,13 @@ exports.handler = async (event) => {
   const authError = validateApiKey(event);
   if (authError) {
     return authError;
+  }
+
+  // Check rate limit
+  const apiKey = event.headers?.['x-api-key'] || event.headers?.['X-Api-Key'];
+  const rateLimitResult = checkRateLimit(apiKey);
+  if (!rateLimitResult.allowed) {
+    return rateLimitExceeded(rateLimitResult.retryAfter);
   }
 
   try {
@@ -35,6 +43,6 @@ exports.handler = async (event) => {
     return success(200, formattedTask);
   } catch (err) {
     console.error('Error retrieving task:', err);
-    return error(503, 'Service temporarily unavailable');
+    return error(500, 'Internal server error: retrieving task');
   }
 };

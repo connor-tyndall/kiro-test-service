@@ -33,6 +33,24 @@ function error(statusCode, message) {
 }
 
 /**
+ * Creates a rate limit exceeded response with Retry-After header
+ * @param {number} retryAfter - Seconds until the client can retry
+ * @returns {Object} Lambda response object with 429 status
+ */
+function rateLimitExceeded(retryAfter) {
+  return {
+    statusCode: 429,
+    headers: {
+      'Content-Type': 'application/json',
+      'Retry-After': String(retryAfter)
+    },
+    body: JSON.stringify({
+      error: 'Rate limit exceeded'
+    })
+  };
+}
+
+/**
  * Formats a DynamoDB item to API task format
  * @param {Object} taskItem - DynamoDB item
  * @returns {Object} Formatted task object
@@ -57,5 +75,6 @@ function formatTask(taskItem) {
 module.exports = {
   success,
   error,
+  rateLimitExceeded,
   formatTask
 };

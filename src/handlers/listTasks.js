@@ -1,4 +1,4 @@
-const { error, success, formatTask } = require('../lib/response');
+const { error, success, formatTask, rateLimitExceeded } = require('../lib/response');
 const { validatePriority, validateStatus, validateDateFormat, validateLimit } = require('../lib/validation');
 const { 
   scanTasks, 
@@ -7,6 +7,7 @@ const {
   queryTasksByPriority 
 } = require('../lib/dynamodb');
 const { validateApiKey } = require('../lib/auth');
+const { checkRateLimit } = require('../lib/rateLimiter');
 
 /**
  * Lambda handler for listing and filtering tasks
@@ -18,6 +19,13 @@ exports.handler = async (event) => {
   const authError = validateApiKey(event);
   if (authError) {
     return authError;
+  }
+
+  // Check rate limit
+  const apiKey = event.headers?.['x-api-key'] || event.headers?.['X-Api-Key'];
+  const rateLimitResult = checkRateLimit(apiKey);
+  if (!rateLimitResult.allowed) {
+    return rateLimitExceeded(rateLimitResult.retryAfter);
   }
 
   try {

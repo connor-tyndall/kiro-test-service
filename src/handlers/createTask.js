@@ -1,8 +1,9 @@
 const { v4: uuidv4 } = require('uuid');
 const { validateTaskInput } = require('../lib/validation');
-const { success, error } = require('../lib/response');
+const { success, error, rateLimitExceeded } = require('../lib/response');
 const { putTask } = require('../lib/dynamodb');
 const { validateApiKey } = require('../lib/auth');
+const { checkRateLimit } = require('../lib/rateLimiter');
 
 /**
  * Lambda handler for creating a new task
@@ -14,6 +15,13 @@ exports.handler = async (event) => {
   const authError = validateApiKey(event);
   if (authError) {
     return authError;
+  }
+
+  // Check rate limit
+  const apiKey = event.headers?.['x-api-key'] || event.headers?.['X-Api-Key'];
+  const rateLimitResult = checkRateLimit(apiKey);
+  if (!rateLimitResult.allowed) {
+    return rateLimitExceeded(rateLimitResult.retryAfter);
   }
 
   try {
@@ -51,6 +59,6 @@ exports.handler = async (event) => {
     return success(201, task);
   } catch (err) {
     console.error('Error creating task:', err);
-    return error(503, 'Service temporarily unavailable');
+    return error(500, 'Internal server error: creating task');
   }
 };

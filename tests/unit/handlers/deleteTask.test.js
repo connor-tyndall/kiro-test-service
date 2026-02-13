@@ -86,8 +86,8 @@ describe('deleteTask handler', () => {
     const response = await handler(event);
     const body = JSON.parse(response.body);
 
-    expect(response.statusCode).toBe(503);
-    expect(body.error).toBe('Service temporarily unavailable');
+    expect(response.statusCode).toBe(500);
+    expect(body.error).toBe('Internal server error: deleting task');
   });
 
   test('should return 401 for missing API key', async () => {

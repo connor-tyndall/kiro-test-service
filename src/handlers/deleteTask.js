@@ -1,6 +1,7 @@
-const { error } = require('../lib/response');
+const { error, rateLimitExceeded } = require('../lib/response');
 const { getTask, deleteTask } = require('../lib/dynamodb');
 const { validateApiKey } = require('../lib/auth');
+const { checkRateLimit } = require('../lib/rateLimiter');
 
 /**
  * Lambda handler for deleting a task
@@ -12,6 +13,13 @@ exports.handler = async (event) => {
   const authError = validateApiKey(event);
   if (authError) {
     return authError;
+  }
+
+  // Check rate limit
+  const apiKey = event.headers?.['x-api-key'] || event.headers?.['X-Api-Key'];
+  const rateLimitResult = checkRateLimit(apiKey);
+  if (!rateLimitResult.allowed) {
+    return rateLimitExceeded(rateLimitResult.retryAfter);
   }
 
   try {
@@ -41,6 +49,6 @@ exports.handler = async (event) => {
     };
   } catch (err) {
     console.error('Error deleting task:', err);
-    return error(503, 'Service temporarily unavailable');
+    return error(500, 'Internal server error: deleting task');
   }
 };
