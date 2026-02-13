@@ -443,5 +443,112 @@ describe('listTasks handler', () => {
       expect(response.statusCode).toBe(400);
       expect(body.error).toBe('Limit must be an integer');
     });
+
+    test('should return 400 for invalid base64 nextToken', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          nextToken: 'not-valid-base64!!!'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toBe('Invalid nextToken parameter');
+    });
+
+    test('should return 400 for malformed base64 nextToken', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          nextToken: '@#$%^&*'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toBe('Invalid nextToken parameter');
+    });
+
+    test('should return 400 for base64 nextToken that decodes to non-JSON', async () => {
+      const nonJsonToken = Buffer.from('not a json string').toString('base64');
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          nextToken: nonJsonToken
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toBe('Invalid nextToken parameter');
+    });
+
+    test('should return 400 for empty nextToken', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          nextToken: ''
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toBe('Invalid nextToken parameter');
+    });
+
+    test('should accept valid base64-encoded JSON nextToken', async () => {
+      const validKey = { PK: 'TASK#123', SK: 'TASK#123' };
+      const validToken = Buffer.from(JSON.stringify(validKey)).toString('base64');
+      scanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          nextToken: validToken
+        }
+      };
+
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(200);
+      expect(scanTasks).toHaveBeenCalledWith(20, validToken);
+    });
+
+    test('should return 400 for invalid nextToken with filters', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          assignee: 'user@example.com',
+          nextToken: 'invalid!!!'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toBe('Invalid nextToken parameter');
+    });
   });
 });

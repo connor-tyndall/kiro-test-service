@@ -190,3 +190,35 @@ export function validateLimit(limit: string | number | null): string | null {
   
   return null;
 }
+
+/**
+ * Validates pagination nextToken parameter
+ * @param nextToken - Base64-encoded pagination token to validate
+ * @returns Error message or null if valid
+ */
+export function validateNextToken(nextToken: string): string | null {
+  if (typeof nextToken !== 'string') {
+    return 'Invalid nextToken parameter';
+  }
+
+  if (nextToken.trim().length === 0) {
+    return 'Invalid nextToken parameter';
+  }
+
+  try {
+    const decoded = Buffer.from(nextToken, 'base64').toString();
+    
+    // Check if the input is valid base64 by re-encoding and comparing
+    const reEncoded = Buffer.from(decoded).toString('base64');
+    if (reEncoded !== nextToken) {
+      return 'Invalid nextToken parameter';
+    }
+
+    // Try to parse as JSON
+    JSON.parse(decoded);
+    
+    return null;
+  } catch (err) {
+    return 'Invalid nextToken parameter';
+  }
+}

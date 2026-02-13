@@ -6,6 +6,7 @@ import {
   validateDescription,
   validateAssignee,
   validateLimit,
+  validateNextToken,
   VALID_PRIORITIES,
   VALID_STATUSES
 } from '../../src/lib/validation';
@@ -328,6 +329,72 @@ describe('Validation Module', () => {
 
     test('should handle null limit', () => {
       expect(validateLimit(null)).toBe('Limit must be at least 1');
+    });
+
+    test('should reject malformed base64 nextToken', () => {
+      expect(validateNextToken('not-valid-base64!!!')).toBe('Invalid nextToken parameter');
+    });
+
+    test('should reject empty nextToken', () => {
+      expect(validateNextToken('')).toBe('Invalid nextToken parameter');
+    });
+
+    test('should reject whitespace-only nextToken', () => {
+      expect(validateNextToken('   ')).toBe('Invalid nextToken parameter');
+    });
+  });
+
+  describe('validateNextToken', () => {
+    test('should accept valid base64-encoded JSON token', () => {
+      const validKey = { PK: 'TASK#123', SK: 'TASK#123' };
+      const validToken = Buffer.from(JSON.stringify(validKey)).toString('base64');
+      expect(validateNextToken(validToken)).toBeNull();
+    });
+
+    test('should accept valid base64-encoded complex JSON token', () => {
+      const validKey = { PK: 'TASK#abc-def-123', SK: 'TASK#abc-def-123', assignee: 'user@example.com' };
+      const validToken = Buffer.from(JSON.stringify(validKey)).toString('base64');
+      expect(validateNextToken(validToken)).toBeNull();
+    });
+
+    test('should reject malformed base64 string', () => {
+      const error = validateNextToken('!!!invalid-base64!!!');
+      expect(error).toBe('Invalid nextToken parameter');
+    });
+
+    test('should reject base64 string that decodes to non-JSON', () => {
+      const nonJsonToken = Buffer.from('not a json string').toString('base64');
+      expect(validateNextToken(nonJsonToken)).toBe('Invalid nextToken parameter');
+    });
+
+    test('should reject empty string', () => {
+      expect(validateNextToken('')).toBe('Invalid nextToken parameter');
+    });
+
+    test('should reject whitespace-only string', () => {
+      expect(validateNextToken('   ')).toBe('Invalid nextToken parameter');
+    });
+
+    test('should reject non-string input', () => {
+      expect(validateNextToken(12345 as unknown as string)).toBe('Invalid nextToken parameter');
+    });
+
+    test('should reject null input', () => {
+      expect(validateNextToken(null as unknown as string)).toBe('Invalid nextToken parameter');
+    });
+
+    test('should reject undefined input', () => {
+      expect(validateNextToken(undefined as unknown as string)).toBe('Invalid nextToken parameter');
+    });
+
+    test('should reject partially valid base64 with padding issues', () => {
+      const error = validateNextToken('abc');
+      expect(error).toBe('Invalid nextToken parameter');
+    });
+
+    test('should reject base64 that looks valid but contains invalid JSON', () => {
+      const invalidJson = Buffer.from('{invalid: json}').toString('base64');
+      expect(validateNextToken(invalidJson)).toBe('Invalid nextToken parameter');
     });
   });
 });

@@ -1,5 +1,5 @@
 import { error, success, formatTask } from '../lib/response';
-import { validatePriority, validateStatus, validateDateFormat, validateLimit } from '../lib/validation';
+import { validatePriority, validateStatus, validateDateFormat, validateLimit, validateNextToken } from '../lib/validation';
 import { 
   scanTasks, 
   queryTasksByAssignee, 
@@ -43,6 +43,14 @@ export const handler = async (event: APIGatewayEvent): Promise<LambdaResponse> =
       const limitError = validateLimit(limit);
       if (limitError) {
         return error(400, limitError);
+      }
+    }
+
+    // Validate nextToken parameter
+    if (nextToken) {
+      const nextTokenError = validateNextToken(nextToken);
+      if (nextTokenError) {
+        return error(400, nextTokenError);
       }
     }
 
