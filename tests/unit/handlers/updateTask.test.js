@@ -179,4 +179,79 @@ describe('updateTask handler', () => {
     expect(response.statusCode).toBe(401);
     expect(body.error).toBe('Invalid API key');
   });
+
+  describe('Edge Cases', () => {
+    test('should handle null pathParameters', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        pathParameters: null,
+        body: JSON.stringify({ description: 'Updated' })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toBe('Task ID is required');
+    });
+
+    test('should handle X-Api-Key header case variation', async () => {
+      getTask.mockResolvedValue(mockExistingTask);
+      putTask.mockResolvedValue({});
+
+      const event = {
+        headers: {
+          'X-Api-Key': 'test-api-key'
+        },
+        pathParameters: { id: '123' },
+        body: JSON.stringify({
+          description: 'Updated task'
+        })
+      };
+
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(200);
+    });
+
+    test('should handle empty update body', async () => {
+      getTask.mockResolvedValue(mockExistingTask);
+      putTask.mockResolvedValue({});
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        pathParameters: { id: '123' },
+        body: '{}'
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.description).toBe('Original task');
+    });
+
+    test('should handle DynamoDB error on putTask', async () => {
+      getTask.mockResolvedValue(mockExistingTask);
+      putTask.mockRejectedValue(new Error('DynamoDB error'));
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        pathParameters: { id: '123' },
+        body: JSON.stringify({ description: 'Updated' })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(500);
+      expect(body.error).toBe('Internal server error: updating task');
+    });
+  });
 });

@@ -121,4 +121,76 @@ describe('getTask handler', () => {
     expect(response.statusCode).toBe(401);
     expect(body.error).toBe('Invalid API key');
   });
+
+  describe('Edge Cases', () => {
+    test('should handle null pathParameters', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        pathParameters: null
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toBe('Task ID is required');
+    });
+
+    test('should handle X-Api-Key header case variation', async () => {
+      const mockTask = {
+        id: '123',
+        description: 'Test task',
+        assignee: 'user@example.com',
+        priority: 'P1',
+        status: 'open',
+        dueDate: '2024-12-31',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z'
+      };
+
+      getTask.mockResolvedValue(mockTask);
+
+      const event = {
+        headers: {
+          'X-Api-Key': 'test-api-key'
+        },
+        pathParameters: { id: '123' }
+      };
+
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(200);
+    });
+
+    test('should handle task with null optional fields', async () => {
+      const mockTask = {
+        id: '123',
+        description: 'Test task',
+        assignee: null,
+        priority: 'P2',
+        status: 'open',
+        dueDate: null,
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z'
+      };
+
+      getTask.mockResolvedValue(mockTask);
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        pathParameters: { id: '123' }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.assignee).toBeNull();
+      expect(body.dueDate).toBeNull();
+    });
+  });
 });

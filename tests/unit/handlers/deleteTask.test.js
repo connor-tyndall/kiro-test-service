@@ -117,4 +117,59 @@ describe('deleteTask handler', () => {
     expect(response.statusCode).toBe(401);
     expect(body.error).toBe('Invalid API key');
   });
+
+  describe('Edge Cases', () => {
+    test('should handle null pathParameters', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        pathParameters: null
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toBe('Task ID is required');
+    });
+
+    test('should handle X-Api-Key header case variation', async () => {
+      const mockTask = {
+        id: '123',
+        description: 'Test task'
+      };
+
+      getTask.mockResolvedValue(mockTask);
+      deleteTask.mockResolvedValue();
+
+      const event = {
+        headers: {
+          'X-Api-Key': 'test-api-key'
+        },
+        pathParameters: { id: '123' }
+      };
+
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(204);
+    });
+
+    test('should handle getTask error', async () => {
+      getTask.mockRejectedValue(new Error('DynamoDB error'));
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        pathParameters: { id: '123' }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(500);
+      expect(body.error).toBe('Internal server error: deleting task');
+    });
+  });
 });

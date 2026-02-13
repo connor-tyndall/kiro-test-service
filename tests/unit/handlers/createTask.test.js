@@ -166,4 +166,53 @@ describe('createTask handler', () => {
     expect(response.statusCode).toBe(401);
     expect(body.error).toBe('Invalid API key');
   });
+
+  describe('Edge Cases', () => {
+    test('should handle empty body', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: '{}'
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toContain('Description is required');
+    });
+
+    test('should handle null body', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: null
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toContain('Description is required');
+    });
+
+    test('should handle X-Api-Key header case variation', async () => {
+      putTask.mockResolvedValue({});
+
+      const event = {
+        headers: {
+          'X-Api-Key': 'test-api-key'
+        },
+        body: JSON.stringify({
+          description: 'Test task'
+        })
+      };
+
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(201);
+    });
+  });
 });
