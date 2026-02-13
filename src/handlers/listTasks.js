@@ -7,13 +7,14 @@ const {
   queryTasksByPriority 
 } = require('../lib/dynamodb');
 const { validateApiKey } = require('../lib/auth');
+const { withLogging } = require('../lib/logger');
 
 /**
  * Lambda handler for listing and filtering tasks
  * @param {Object} event - API Gateway event
  * @returns {Promise<Object>} API Gateway response
  */
-exports.handler = async (event) => {
+const listTasksHandler = async (event) => {
   // Validate API key
   const authError = validateApiKey(event);
   if (authError) {
@@ -113,3 +114,5 @@ exports.handler = async (event) => {
     return error(500, 'Internal server error: listing tasks');
   }
 };
+
+exports.handler = withLogging(listTasksHandler);

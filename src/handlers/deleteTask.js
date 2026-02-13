@@ -1,13 +1,14 @@
 const { error } = require('../lib/response');
 const { getTask, deleteTask } = require('../lib/dynamodb');
 const { validateApiKey } = require('../lib/auth');
+const { withLogging } = require('../lib/logger');
 
 /**
  * Lambda handler for deleting a task
  * @param {Object} event - API Gateway event
  * @returns {Promise<Object>} API Gateway response
  */
-exports.handler = async (event) => {
+const deleteTaskHandler = async (event) => {
   // Validate API key
   const authError = validateApiKey(event);
   if (authError) {
@@ -44,3 +45,5 @@ exports.handler = async (event) => {
     return error(503, 'Service temporarily unavailable');
   }
 };
+
+exports.handler = withLogging(deleteTaskHandler);
