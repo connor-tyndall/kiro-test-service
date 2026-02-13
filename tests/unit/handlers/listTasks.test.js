@@ -290,7 +290,8 @@ describe('listTasks handler', () => {
     });
 
     test('should pass nextToken to DynamoDB', async () => {
-      const token = 'test-token';
+      const validKey = { PK: 'TASK#123', SK: 'TASK#123' };
+      const token = Buffer.from(JSON.stringify(validKey)).toString('base64');
       scanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
 
       const event = {
@@ -392,7 +393,9 @@ describe('listTasks handler', () => {
     });
 
     test('should work with pagination and filters', async () => {
-      const nextToken = 'next-page-token';
+      const validKey = { PK: 'TASK#123', SK: 'TASK#123', assignee: 'user1@example.com' };
+      const prevToken = Buffer.from(JSON.stringify(validKey)).toString('base64');
+      const nextToken = Buffer.from(JSON.stringify({ PK: 'TASK#456', SK: 'TASK#456' })).toString('base64');
       queryTasksByAssignee.mockResolvedValue({ items: [mockTasks[0]], nextToken });
 
       const event = {
@@ -402,7 +405,7 @@ describe('listTasks handler', () => {
         queryStringParameters: {
           assignee: 'user1@example.com',
           limit: '10',
-          nextToken: 'prev-token'
+          nextToken: prevToken
         }
       };
 
@@ -412,7 +415,7 @@ describe('listTasks handler', () => {
       expect(response.statusCode).toBe(200);
       expect(body.tasks).toHaveLength(1);
       expect(body.nextToken).toBe(nextToken);
-      expect(queryTasksByAssignee).toHaveBeenCalledWith('user1@example.com', 10, 'prev-token');
+      expect(queryTasksByAssignee).toHaveBeenCalledWith('user1@example.com', 10, prevToken);
     });
   });
 
@@ -539,6 +542,291 @@ describe('listTasks handler', () => {
 
       expect(response.statusCode).toBe(400);
       expect(body.error).toBe('Invalid nextToken parameter');
+    });
+
+    test('should return exactly the requested limit when multiple filters match', async () => {
+      const matchingTasks = Array.from({ length: 5 }, (_, i) => ({
+        id: `${i + 1}`,
+        description: `Task ${i + 1}`,
+        assignee: 'user@test.com',
+        priority: 'P1',
+        status: 'open',
+        dueDate: '2024-12-31',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z'
+      }));
+
+      queryTasksByAssignee.mockResolvedValue({ items: matchingTasks, nextToken: null });
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          assignee: 'user@test.com',
+          status: 'open',
+          limit: '5'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.tasks).toHaveLength(5);
+      expect(body.nextToken).toBeUndefined();
+    });
+
+    test('should continue fetching when first DynamoDB page has insufficient matches', async () => {
+      const page1Tasks = [
+        { id: '1', assignee: 'user@test.com', status: 'closed', priority: 'P1', dueDate: '2024-12-31', createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' },
+        { id: '2', assignee: 'user@test.com', status: 'open', priority: 'P1', dueDate: '2024-12-31', createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' }
+      ];
+      const page2Tasks = [
+        { id: '3', assignee: 'user@test.com', status: 'open', priority: 'P1', dueDate: '2024-12-31', createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' },
+        { id: '4', assignee: 'user@test.com', status: 'open', priority: 'P1', dueDate: '2024-12-31', createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' }
+      ];
+
+      queryTasksByAssignee
+        .mockResolvedValueOnce({ items: page1Tasks, nextToken: 'token1' })
+        .mockResolvedValueOnce({ items: page2Tasks, nextToken: null });
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          assignee: 'user@test.com',
+          status: 'open',
+          limit: '3'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.tasks).toHaveLength(3);
+      expect(body.tasks.map(t => t.id)).toEqual(['2', '3', '4']);
+      expect(queryTasksByAssignee).toHaveBeenCalledTimes(2);
+    });
+
+    test('should handle pagination across multiple pages with multiple filters', async () => {
+      const page1Tasks = [
+        { id: '1', assignee: 'user@test.com', status: 'closed', priority: 'P1', dueDate: '2024-12-31', createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' },
+        { id: '2', assignee: 'user@test.com', status: 'open', priority: 'P1', dueDate: '2024-12-31', createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' }
+      ];
+      const page2Tasks = [
+        { id: '3', assignee: 'user@test.com', status: 'open', priority: 'P1', dueDate: '2024-12-31', createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' }
+      ];
+
+      queryTasksByAssignee
+        .mockResolvedValueOnce({ items: page1Tasks, nextToken: 'token1' })
+        .mockResolvedValueOnce({ items: page2Tasks, nextToken: 'token2' });
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          assignee: 'user@test.com',
+          status: 'open',
+          limit: '2'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.tasks).toHaveLength(2);
+      expect(body.nextToken).toBe('token2');
+    });
+
+    test('should traverse many DynamoDB pages when filters are highly selective', async () => {
+      const createPage = (id, status) => [
+        { id: `${id}`, assignee: 'user@test.com', status, priority: 'P1', dueDate: '2024-12-31', createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' }
+      ];
+
+      queryTasksByAssignee
+        .mockResolvedValueOnce({ items: createPage(1, 'closed'), nextToken: 'token1' })
+        .mockResolvedValueOnce({ items: createPage(2, 'closed'), nextToken: 'token2' })
+        .mockResolvedValueOnce({ items: createPage(3, 'closed'), nextToken: 'token3' })
+        .mockResolvedValueOnce({ items: createPage(4, 'open'), nextToken: 'token4' })
+        .mockResolvedValueOnce({ items: createPage(5, 'open'), nextToken: null });
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          assignee: 'user@test.com',
+          status: 'open',
+          limit: '2'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.tasks).toHaveLength(2);
+      expect(body.tasks.map(t => t.id)).toEqual(['4', '5']);
+      expect(queryTasksByAssignee).toHaveBeenCalledTimes(5);
+      expect(body.nextToken).toBeUndefined();
+    });
+
+    test('should return no nextToken when DynamoDB is exhausted before reaching limit', async () => {
+      const tasks = [
+        { id: '1', assignee: 'user@test.com', status: 'open', priority: 'P1', dueDate: '2024-12-31', createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' }
+      ];
+
+      queryTasksByAssignee.mockResolvedValue({ items: tasks, nextToken: null });
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          assignee: 'user@test.com',
+          status: 'open',
+          limit: '10'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.tasks).toHaveLength(1);
+      expect(body.nextToken).toBeUndefined();
+    });
+
+    test('should handle dueDateBefore filter with pagination accumulation', async () => {
+      const page1Tasks = [
+        { id: '1', assignee: 'user@test.com', status: 'open', priority: 'P1', dueDate: '2024-12-31', createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' },
+        { id: '2', assignee: 'user@test.com', status: 'open', priority: 'P1', dueDate: '2024-06-15', createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' }
+      ];
+      const page2Tasks = [
+        { id: '3', assignee: 'user@test.com', status: 'open', priority: 'P1', dueDate: '2024-05-01', createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' }
+      ];
+
+      queryTasksByAssignee
+        .mockResolvedValueOnce({ items: page1Tasks, nextToken: 'token1' })
+        .mockResolvedValueOnce({ items: page2Tasks, nextToken: null });
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          assignee: 'user@test.com',
+          dueDateBefore: '2024-07-01',
+          limit: '2'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.tasks).toHaveLength(2);
+      expect(body.tasks.map(t => t.id)).toEqual(['2', '3']);
+    });
+
+    test('should handle status and priority filters with pagination', async () => {
+      const page1Tasks = [
+        { id: '1', assignee: 'user@test.com', status: 'open', priority: 'P2', dueDate: '2024-12-31', createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' },
+        { id: '2', assignee: 'user@test.com', status: 'open', priority: 'P1', dueDate: '2024-12-31', createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' }
+      ];
+      const page2Tasks = [
+        { id: '3', assignee: 'user@test.com', status: 'open', priority: 'P1', dueDate: '2024-12-31', createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' }
+      ];
+
+      queryTasksByStatus
+        .mockResolvedValueOnce({ items: page1Tasks, nextToken: 'token1' })
+        .mockResolvedValueOnce({ items: page2Tasks, nextToken: null });
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          status: 'open',
+          priority: 'P1',
+          limit: '2'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.tasks).toHaveLength(2);
+      expect(body.tasks.map(t => t.id)).toEqual(['2', '3']);
+    });
+
+    test('should handle dueDateBefore only filter with scan pagination', async () => {
+      const page1Tasks = [
+        { id: '1', status: 'open', priority: 'P1', dueDate: '2024-12-31', createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' },
+        { id: '2', status: 'open', priority: 'P1', dueDate: '2024-06-15', createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' }
+      ];
+      const page2Tasks = [
+        { id: '3', status: 'open', priority: 'P1', dueDate: '2024-05-01', createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' }
+      ];
+
+      scanTasks
+        .mockResolvedValueOnce({ items: page1Tasks, nextToken: 'token1' })
+        .mockResolvedValueOnce({ items: page2Tasks, nextToken: null });
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          dueDateBefore: '2024-07-01',
+          limit: '2'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.tasks).toHaveLength(2);
+      expect(body.tasks.map(t => t.id)).toEqual(['2', '3']);
+    });
+
+    test('should handle priority filter with dueDateBefore using accumulation', async () => {
+      const page1Tasks = [
+        { id: '1', assignee: 'user@test.com', status: 'open', priority: 'P1', dueDate: '2024-12-31', createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' },
+        { id: '2', assignee: 'user@test.com', status: 'open', priority: 'P1', dueDate: '2024-05-15', createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' }
+      ];
+      const page2Tasks = [
+        { id: '3', assignee: 'user@test.com', status: 'open', priority: 'P1', dueDate: '2024-04-01', createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' }
+      ];
+
+      queryTasksByPriority
+        .mockResolvedValueOnce({ items: page1Tasks, nextToken: 'token1' })
+        .mockResolvedValueOnce({ items: page2Tasks, nextToken: null });
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          priority: 'P1',
+          dueDateBefore: '2024-06-01',
+          limit: '2'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.tasks).toHaveLength(2);
+      expect(body.tasks.map(t => t.id)).toEqual(['2', '3']);
     });
   });
 });

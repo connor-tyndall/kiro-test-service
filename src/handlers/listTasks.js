@@ -9,6 +9,48 @@ const {
 const { validateApiKey } = require('../lib/auth');
 
 /**
+ * Accumulates filtered results from DynamoDB until the limit is reached or no more items
+ * @param {Function} queryFn - DynamoDB query function to call
+ * @param {Function} filterFn - Filter function to apply to items
+ * @param {number} limit - Target number of items to accumulate
+ * @param {string|null} startToken - Initial pagination token
+ * @returns {Promise<Object>} Object with items array and nextToken
+ */
+async function accumulateFilteredResults(queryFn, filterFn, limit, startToken) {
+  const accumulatedItems = [];
+  let currentToken = startToken;
+  let lastProcessedToken = null;
+  
+  while (accumulatedItems.length < limit) {
+    const result = await queryFn(currentToken);
+    const filteredBatch = result.items.filter(filterFn);
+    
+    for (const item of filteredBatch) {
+      if (accumulatedItems.length < limit) {
+        accumulatedItems.push(item);
+      } else {
+        break;
+      }
+    }
+    
+    lastProcessedToken = result.nextToken;
+    
+    if (!result.nextToken) {
+      break;
+    }
+    
+    currentToken = result.nextToken;
+  }
+  
+  const hasMoreResults = accumulatedItems.length >= limit && lastProcessedToken !== null;
+  
+  return {
+    items: accumulatedItems,
+    nextToken: hasMoreResults ? lastProcessedToken : null
+  };
+}
+
+/**
  * Lambda handler for listing and filtering tasks
  * @param {Object} event - API Gateway event
  * @returns {Promise<Object>} API Gateway response
@@ -46,7 +88,7 @@ exports.handler = async (event) => {
     }
 
     // Validate nextToken parameter
-    if (nextToken) {
+    if (nextToken !== undefined && nextToken !== null) {
       const nextTokenError = validateNextToken(nextToken);
       if (nextTokenError) {
         return error(400, nextTokenError);
@@ -57,12 +99,13 @@ exports.handler = async (event) => {
 
     // Determine which query strategy to use based on filters
     const filterCount = [assignee, priority, status].filter(f => f).length;
+    const needsPostFiltering = filterCount > 1 || dueDateBefore;
 
-    if (filterCount === 0) {
+    if (filterCount === 0 && !dueDateBefore) {
       // No filters - scan all tasks
       result = await scanTasks(parsedLimit, nextToken);
-    } else if (filterCount === 1) {
-      // Single filter - use appropriate GSI
+    } else if (filterCount === 1 && !dueDateBefore) {
+      // Single filter without dueDateBefore - use appropriate GSI directly
       if (assignee) {
         result = await queryTasksByAssignee(assignee, parsedLimit, nextToken);
       } else if (status) {
@@ -70,40 +113,61 @@ exports.handler = async (event) => {
       } else if (priority) {
         result = await queryTasksByPriority(priority, parsedLimit, nextToken);
       }
-    } else {
-      // Multiple filters - use most selective GSI and filter in code
-      // Priority: assignee > status > priority (assignee typically most selective)
+    } else if (needsPostFiltering) {
+      // Multiple filters or dueDateBefore - need to accumulate filtered results
+      const filterDate = dueDateBefore ? new Date(dueDateBefore) : null;
+      
+      const buildFilterFn = () => {
+        return (task) => {
+          if (status && task.status !== status) return false;
+          if (priority && task.priority !== priority) return false;
+          if (filterDate) {
+            if (!task.dueDate) return false;
+            const taskDate = new Date(task.dueDate);
+            if (taskDate > filterDate) return false;
+          }
+          return true;
+        };
+      };
+      
+      const filterFn = buildFilterFn();
+      
       if (assignee) {
-        result = await queryTasksByAssignee(assignee, parsedLimit, nextToken);
-        
-        // Apply additional filters in code
-        if (status) {
-          result.items = result.items.filter(task => task.status === status);
-        }
-        if (priority) {
-          result.items = result.items.filter(task => task.priority === priority);
-        }
+        const queryFn = (token) => queryTasksByAssignee(assignee, parsedLimit, token);
+        result = await accumulateFilteredResults(queryFn, filterFn, parsedLimit, nextToken);
       } else if (status) {
-        result = await queryTasksByStatus(status, parsedLimit, nextToken);
-        
-        // Apply priority filter in code
-        if (priority) {
-          result.items = result.items.filter(task => task.priority === priority);
-        }
+        const queryFn = (token) => queryTasksByStatus(status, parsedLimit, token);
+        const statusFilterFn = (task) => {
+          if (priority && task.priority !== priority) return false;
+          if (filterDate) {
+            if (!task.dueDate) return false;
+            const taskDate = new Date(task.dueDate);
+            if (taskDate > filterDate) return false;
+          }
+          return true;
+        };
+        result = await accumulateFilteredResults(queryFn, statusFilterFn, parsedLimit, nextToken);
+      } else if (priority) {
+        const queryFn = (token) => queryTasksByPriority(priority, parsedLimit, token);
+        const priorityFilterFn = (task) => {
+          if (filterDate) {
+            if (!task.dueDate) return false;
+            const taskDate = new Date(task.dueDate);
+            if (taskDate > filterDate) return false;
+          }
+          return true;
+        };
+        result = await accumulateFilteredResults(queryFn, priorityFilterFn, parsedLimit, nextToken);
       } else {
-        // Only priority filter remains
-        result = await queryTasksByPriority(priority, parsedLimit, nextToken);
+        // Only dueDateBefore filter - scan and filter
+        const queryFn = (token) => scanTasks(parsedLimit, token);
+        const dueDateFilterFn = (task) => {
+          if (!task.dueDate) return false;
+          const taskDate = new Date(task.dueDate);
+          return taskDate <= filterDate;
+        };
+        result = await accumulateFilteredResults(queryFn, dueDateFilterFn, parsedLimit, nextToken);
       }
-    }
-
-    // Apply due date filter in application code
-    if (dueDateBefore) {
-      const filterDate = new Date(dueDateBefore);
-      result.items = result.items.filter(task => {
-        if (!task.dueDate) return false;
-        const taskDate = new Date(task.dueDate);
-        return taskDate <= filterDate;
-      });
     }
 
     // Format tasks
