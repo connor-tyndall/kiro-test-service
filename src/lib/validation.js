@@ -189,6 +189,38 @@ function validateLimit(limit) {
   return null;
 }
 
+/**
+ * Validates pagination nextToken parameter
+ * @param {string} nextToken - Base64-encoded pagination token to validate
+ * @returns {string|null} Error message or null if valid
+ */
+function validateNextToken(nextToken) {
+  if (typeof nextToken !== 'string') {
+    return 'Invalid nextToken parameter';
+  }
+
+  if (nextToken.trim().length === 0) {
+    return 'Invalid nextToken parameter';
+  }
+
+  try {
+    const decoded = Buffer.from(nextToken, 'base64').toString();
+    
+    // Check if the input is valid base64 by re-encoding and comparing
+    const reEncoded = Buffer.from(decoded).toString('base64');
+    if (reEncoded !== nextToken) {
+      return 'Invalid nextToken parameter';
+    }
+
+    // Try to parse as JSON
+    JSON.parse(decoded);
+    
+    return null;
+  } catch (err) {
+    return 'Invalid nextToken parameter';
+  }
+}
+
 module.exports = {
   validateTaskInput,
   validatePriority,
@@ -197,6 +229,7 @@ module.exports = {
   validateDescription,
   validateAssignee,
   validateLimit,
+  validateNextToken,
   VALID_PRIORITIES,
   VALID_STATUSES
 };
