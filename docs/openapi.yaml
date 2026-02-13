@@ -154,7 +154,7 @@ paths:
             enum:
               - open
               - in-progress
-              - closed
+              - done
           example: open
         - name: priority
           in: query
@@ -163,6 +163,7 @@ paths:
           schema:
             type: string
             enum:
+              - P0
               - P1
               - P2
               - P3
@@ -202,7 +203,7 @@ paths:
                       - id: 770e8400-e29b-41d4-a716-446655440002
                         description: Update documentation
                         assignee: null
-                        status: closed
+                        status: done
                         priority: P3
                         createdAt: '2024-01-10T14:00:00.000Z'
                         updatedAt: '2024-01-12T16:30:00.000Z'
@@ -400,12 +401,13 @@ components:
           enum:
             - open
             - in-progress
-            - closed
+            - done
           example: open
         priority:
           type: string
           description: Priority level of the task (P1 is highest, P4 is lowest)
           enum:
+            - P0
             - P1
             - P2
             - P3
@@ -421,6 +423,11 @@ components:
           format: date-time
           description: ISO 8601 timestamp when the task was last updated
           example: '2024-01-15T10:30:00.000Z'
+        dueDate:
+          type: string
+          format: date-time
+          description: Optional due date for the task
+          example: '2024-01-20T17:00:00.000Z'
 
     TaskCreateRequest:
       type: object
@@ -446,19 +453,25 @@ components:
           enum:
             - open
             - in-progress
-            - closed
+            - done
           default: open
           example: open
         priority:
           type: string
           description: Priority level of the task (defaults to "P2" if not provided)
           enum:
+            - P0
             - P1
             - P2
             - P3
             - P4
           default: P2
           example: P1
+        dueDate:
+          type: string
+          format: date-time
+          description: Optional due date for the task
+          example: '2024-01-20T17:00:00.000Z'
 
     TaskUpdateRequest:
       type: object
@@ -482,17 +495,23 @@ components:
           enum:
             - open
             - in-progress
-            - closed
+            - done
           example: in-progress
         priority:
           type: string
           description: Updated priority level of the task
           enum:
+            - P0
             - P1
             - P2
             - P3
             - P4
           example: P1
+        dueDate:
+          type: string
+          format: date-time
+          description: Optional due date for the task
+          example: '2024-01-20T17:00:00.000Z'
 
     TaskListResponse:
       type: object
@@ -563,7 +582,7 @@ components:
             invalidStatus:
               summary: Invalid status value
               value:
-                error: 'Status must be one of: open, in-progress, closed'
+                error: 'Status must be one of: open, in-progress, done'
             invalidAssignee:
               summary: Invalid assignee email
               value:
