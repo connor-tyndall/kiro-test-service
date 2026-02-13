@@ -181,6 +181,27 @@ describe('updateTask handler', () => {
   });
 
   describe('Edge Cases', () => {
+    test('should handle DynamoDB errors', async () => {
+      getTask.mockResolvedValue(mockExistingTask);
+      putTask.mockRejectedValue(new Error('DynamoDB error'));
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        pathParameters: { id: '123' },
+        body: JSON.stringify({
+          description: 'Updated task'
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(500);
+      expect(body.error).toBe('Internal server error: updating task');
+    });
+
     test('should handle null pathParameters', async () => {
       const event = {
         headers: {
@@ -248,9 +269,24 @@ describe('updateTask handler', () => {
       expect(body.description).toBe(mockExistingTask.description);
     });
 
-    test('should handle DynamoDB error', async () => {
-      getTask.mockResolvedValue(mockExistingTask);
-      putTask.mockRejectedValue(new Error('DynamoDB error'));
+    test('should handle invalid JSON body', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        pathParameters: { id: '123' },
+        body: 'invalid json'
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toBe('Invalid JSON in request body');
+    });
+
+    test('should handle getTask error during existence check', async () => {
+      getTask.mockRejectedValue(new Error('DynamoDB connection error'));
 
       const event = {
         headers: {

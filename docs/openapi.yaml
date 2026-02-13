@@ -1,0 +1,627 @@
+openapi: 3.0.3
+info:
+  title: Task Tracker API
+  description: |
+    A RESTful API for managing tasks in a task tracking system.
+    
+    This API allows you to create, read, update, and delete tasks, as well as
+    list tasks with pagination and filtering capabilities.
+    
+    ## Authentication
+    All endpoints except the health check require authentication via an API key
+    passed in the `x-api-key` header.
+  version: 1.0.0
+  contact:
+    name: API Support
+
+servers:
+  - url: https://api.example.com/v1
+    description: Production server
+  - url: https://api-staging.example.com/v1
+    description: Staging server
+
+tags:
+  - name: Health
+    description: Health check endpoints
+  - name: Tasks
+    description: Task management endpoints
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check endpoint
+      description: |
+        Returns the health status of the API service.
+        This endpoint does not require authentication.
+      operationId: getHealth
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: healthy
+                timestamp: '2024-01-15T10:30:00.000Z'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /tasks:
+    post:
+      tags:
+        - Tasks
+      summary: Create a new task
+      description: |
+        Creates a new task with the provided details.
+        
+        The task will be assigned a unique UUID and timestamps for creation and last update.
+        If not provided, status defaults to "open" and priority defaults to "P2".
+      operationId: createTask
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        description: Task data to create
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskCreateRequest'
+            examples:
+              minimal:
+                summary: Minimal task creation
+                value:
+                  description: Complete quarterly report
+              full:
+                summary: Full task creation
+                value:
+                  description: Complete quarterly report
+                  assignee: john.doe@example.com
+                  status: open
+                  priority: P1
+      responses:
+        '201':
+          description: Task created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+              example:
+                id: 550e8400-e29b-41d4-a716-446655440000
+                description: Complete quarterly report
+                assignee: john.doe@example.com
+                status: open
+                priority: P1
+                createdAt: '2024-01-15T10:30:00.000Z'
+                updatedAt: '2024-01-15T10:30:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+    get:
+      tags:
+        - Tasks
+      summary: List tasks with pagination and filtering
+      description: |
+        Retrieves a paginated list of tasks with optional filtering by assignee, status, and priority.
+        
+        Results are returned in pages, with a `nextToken` provided when more results are available.
+        Use the `nextToken` value in subsequent requests to retrieve the next page of results.
+      operationId: listTasks
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of tasks to return per page
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          example: 20
+        - name: nextToken
+          in: query
+          description: Pagination cursor token from a previous response to retrieve the next page of results
+          required: false
+          schema:
+            type: string
+          example: eyJpZCI6IjU1MGU4NDAwLWUyOWItNDFkNC1hNzE2LTQ0NjY1NTQ0MDAwMCJ9
+        - name: assignee
+          in: query
+          description: Filter tasks by assignee email address
+          required: false
+          schema:
+            type: string
+            format: email
+          example: john.doe@example.com
+        - name: status
+          in: query
+          description: Filter tasks by status
+          required: false
+          schema:
+            type: string
+            enum:
+              - open
+              - in-progress
+              - done
+          example: open
+        - name: priority
+          in: query
+          description: Filter tasks by priority level
+          required: false
+          schema:
+            type: string
+            enum:
+              - P0
+              - P1
+              - P2
+              - P3
+              - P4
+          example: P1
+      responses:
+        '200':
+          description: List of tasks retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskListResponse'
+              examples:
+                withNextToken:
+                  summary: Response with more results available
+                  value:
+                    tasks:
+                      - id: 550e8400-e29b-41d4-a716-446655440000
+                        description: Complete quarterly report
+                        assignee: john.doe@example.com
+                        status: open
+                        priority: P1
+                        createdAt: '2024-01-15T10:30:00.000Z'
+                        updatedAt: '2024-01-15T10:30:00.000Z'
+                      - id: 660e8400-e29b-41d4-a716-446655440001
+                        description: Review pull requests
+                        assignee: jane.smith@example.com
+                        status: in-progress
+                        priority: P2
+                        createdAt: '2024-01-14T09:00:00.000Z'
+                        updatedAt: '2024-01-15T08:00:00.000Z'
+                    nextToken: eyJpZCI6IjY2MGU4NDAwLWUyOWItNDFkNC1hNzE2LTQ0NjY1NTQ0MDAwMSJ9
+                lastPage:
+                  summary: Last page of results (no nextToken)
+                  value:
+                    tasks:
+                      - id: 770e8400-e29b-41d4-a716-446655440002
+                        description: Update documentation
+                        assignee: null
+                        status: done
+                        priority: P3
+                        createdAt: '2024-01-10T14:00:00.000Z'
+                        updatedAt: '2024-01-12T16:30:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /tasks/{taskId}:
+    parameters:
+      - name: taskId
+        in: path
+        description: Unique identifier of the task (UUID format)
+        required: true
+        schema:
+          type: string
+          format: uuid
+        example: 550e8400-e29b-41d4-a716-446655440000
+
+    get:
+      tags:
+        - Tasks
+      summary: Get a specific task by ID
+      description: Retrieves detailed information about a specific task identified by its unique ID.
+      operationId: getTask
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Task retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+              example:
+                id: 550e8400-e29b-41d4-a716-446655440000
+                description: Complete quarterly report
+                assignee: john.doe@example.com
+                status: open
+                priority: P1
+                createdAt: '2024-01-15T10:30:00.000Z'
+                updatedAt: '2024-01-15T10:30:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Task not found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+    put:
+      tags:
+        - Tasks
+      summary: Update an existing task
+      description: |
+        Updates an existing task with the provided data.
+        
+        Only the fields included in the request body will be updated.
+        The `id` and `createdAt` fields are immutable and cannot be changed.
+        The `updatedAt` field is automatically set to the current timestamp.
+      operationId: updateTask
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        description: Task fields to update
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskUpdateRequest'
+            examples:
+              updateStatus:
+                summary: Update task status
+                value:
+                  status: in-progress
+              updateMultiple:
+                summary: Update multiple fields
+                value:
+                  description: Updated task description
+                  assignee: new.assignee@example.com
+                  status: in-progress
+                  priority: P1
+      responses:
+        '200':
+          description: Task updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+              example:
+                id: 550e8400-e29b-41d4-a716-446655440000
+                description: Updated task description
+                assignee: new.assignee@example.com
+                status: in-progress
+                priority: P1
+                createdAt: '2024-01-15T10:30:00.000Z'
+                updatedAt: '2024-01-16T14:45:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Task not found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+    delete:
+      tags:
+        - Tasks
+      summary: Delete a task
+      description: Permanently deletes a task identified by its unique ID.
+      operationId: deleteTask
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '204':
+          description: Task deleted successfully (no content returned)
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Task not found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: API key for authentication. Required for all endpoints except health check.
+
+  schemas:
+    Task:
+      type: object
+      description: A task object representing a work item in the task tracker
+      required:
+        - id
+        - description
+        - status
+        - priority
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the task (UUID v4)
+          example: 550e8400-e29b-41d4-a716-446655440000
+        description:
+          type: string
+          description: Detailed description of the task
+          maxLength: 1000
+          example: Complete quarterly report
+        assignee:
+          type: string
+          format: email
+          nullable: true
+          description: Email address of the person assigned to the task
+          example: john.doe@example.com
+        status:
+          type: string
+          description: Current status of the task
+          enum:
+            - open
+            - in-progress
+            - done
+          example: open
+        priority:
+          type: string
+          description: Priority level of the task (P1 is highest, P4 is lowest)
+          enum:
+            - P0
+            - P1
+            - P2
+            - P3
+            - P4
+          example: P1
+        createdAt:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp when the task was created
+          example: '2024-01-15T10:30:00.000Z'
+        updatedAt:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp when the task was last updated
+          example: '2024-01-15T10:30:00.000Z'
+        dueDate:
+          type: string
+          format: date-time
+          description: Optional due date for the task
+          example: '2024-01-20T17:00:00.000Z'
+
+    TaskCreateRequest:
+      type: object
+      description: Request body for creating a new task
+      required:
+        - description
+      properties:
+        description:
+          type: string
+          description: Detailed description of the task
+          minLength: 1
+          maxLength: 1000
+          example: Complete quarterly report
+        assignee:
+          type: string
+          format: email
+          nullable: true
+          description: Email address of the person to assign the task to
+          example: john.doe@example.com
+        status:
+          type: string
+          description: Initial status of the task (defaults to "open" if not provided)
+          enum:
+            - open
+            - in-progress
+            - done
+          default: open
+          example: open
+        priority:
+          type: string
+          description: Priority level of the task (defaults to "P2" if not provided)
+          enum:
+            - P0
+            - P1
+            - P2
+            - P3
+            - P4
+          default: P2
+          example: P1
+        dueDate:
+          type: string
+          format: date-time
+          description: Optional due date for the task
+          example: '2024-01-20T17:00:00.000Z'
+
+    TaskUpdateRequest:
+      type: object
+      description: Request body for updating an existing task. All fields are optional.
+      properties:
+        description:
+          type: string
+          description: Updated description of the task
+          minLength: 1
+          maxLength: 1000
+          example: Updated task description
+        assignee:
+          type: string
+          format: email
+          nullable: true
+          description: Email address of the person to assign the task to (set to null to unassign)
+          example: new.assignee@example.com
+        status:
+          type: string
+          description: Updated status of the task
+          enum:
+            - open
+            - in-progress
+            - done
+          example: in-progress
+        priority:
+          type: string
+          description: Updated priority level of the task
+          enum:
+            - P0
+            - P1
+            - P2
+            - P3
+            - P4
+          example: P1
+        dueDate:
+          type: string
+          format: date-time
+          description: Optional due date for the task
+          example: '2024-01-20T17:00:00.000Z'
+
+    TaskListResponse:
+      type: object
+      description: Response containing a paginated list of tasks
+      required:
+        - tasks
+      properties:
+        tasks:
+          type: array
+          description: Array of task objects
+          items:
+            $ref: '#/components/schemas/Task'
+        nextToken:
+          type: string
+          description: Pagination cursor token to retrieve the next page of results. Not present if this is the last page.
+          example: eyJpZCI6IjU1MGU4NDAwLWUyOWItNDFkNC1hNzE2LTQ0NjY1NTQ0MDAwMCJ9
+
+    HealthResponse:
+      type: object
+      description: Health check response
+      required:
+        - status
+        - timestamp
+      properties:
+        status:
+          type: string
+          description: Health status of the service
+          enum:
+            - healthy
+          example: healthy
+        timestamp:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp of the health check
+          example: '2024-01-15T10:30:00.000Z'
+
+    Error:
+      type: object
+      description: Error response object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Human-readable error message describing what went wrong
+          example: Invalid request parameters
+
+  responses:
+    BadRequest:
+      description: Bad Request - The request was invalid or malformed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            invalidJson:
+              summary: Invalid JSON in request body
+              value:
+                error: Invalid JSON in request body
+            missingDescription:
+              summary: Missing required field
+              value:
+                error: Description is required
+            invalidPriority:
+              summary: Invalid priority value
+              value:
+                error: 'Priority must be one of: P1, P2, P3, P4'
+            invalidStatus:
+              summary: Invalid status value
+              value:
+                error: 'Status must be one of: open, in-progress, done'
+            invalidAssignee:
+              summary: Invalid assignee email
+              value:
+                error: Assignee must be a valid email address
+            invalidLimit:
+              summary: Invalid limit parameter
+              value:
+                error: Limit must be between 1 and 100
+
+    Unauthorized:
+      description: Unauthorized - Missing or invalid API key
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            missingApiKey:
+              summary: Missing API key
+              value:
+                error: Missing API key
+            invalidApiKey:
+              summary: Invalid API key
+              value:
+                error: Invalid API key
+
+    InternalServerError:
+      description: Internal Server Error - An unexpected error occurred on the server
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Internal server error
+
+    ServiceUnavailable:
+      description: Service Unavailable - The service is temporarily unavailable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Service temporarily unavailable

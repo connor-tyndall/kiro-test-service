@@ -145,5 +145,15 @@ describe('Auth Module', () => {
       expect(result.statusCode).toBe(401);
       expect(JSON.parse(result.body).error).toBe('Missing API key');
     });
+
+    test('should handle whitespace-only API key', () => {
+      const event = {
+        headers: {
+          'x-api-key': '   '
+        }
+      };
+      const result = validateApiKey(event);
+      expect(result.statusCode).toBe(401);
+    });
   });
 });

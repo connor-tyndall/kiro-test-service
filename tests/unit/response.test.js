@@ -213,5 +213,20 @@ describe('Response Module', () => {
       expect(formatted.extraField).toBeUndefined();
       expect(formatted.id).toBe('123');
     });
+
+    test('should handle success with nested objects', () => {
+      const body = {
+        task: {
+          id: '123',
+          nested: {
+            value: 'deep'
+          }
+        }
+      };
+      const response = success(200, body);
+
+      expect(response.statusCode).toBe(200);
+      expect(JSON.parse(response.body)).toEqual(body);
+    });
   });
 });

@@ -198,6 +198,23 @@ describe('createTask handler', () => {
       expect(body.error).toContain('Description is required');
     });
 
+    test('should handle empty string description', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: JSON.stringify({
+          description: ''
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toContain('Description');
+    });
+
     test('should handle whitespace-only description', async () => {
       const event = {
         headers: {

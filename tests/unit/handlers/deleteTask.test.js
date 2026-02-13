@@ -161,6 +161,20 @@ describe('deleteTask handler', () => {
       expect(body.error).toBe('Task ID is required');
     });
 
+    test('should handle undefined pathParameters', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toBe('Task ID is required');
+    });
+
     test('should handle getTask error during existence check', async () => {
       getTask.mockRejectedValue(new Error('DynamoDB error'));
 
