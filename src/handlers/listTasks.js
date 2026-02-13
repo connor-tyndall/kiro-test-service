@@ -1,5 +1,5 @@
 const { error, success, formatTask, rateLimitExceeded } = require('../lib/response');
-const { validatePriority, validateStatus, validateDateFormat, validateLimit } = require('../lib/validation');
+const { validatePriority, validateStatus, validateDateFormat, validateLimit, validateNextToken } = require('../lib/validation');
 const { 
   scanTasks, 
   queryTasksByAssignee, 
@@ -50,6 +50,14 @@ exports.handler = async (event) => {
       const limitError = validateLimit(limit);
       if (limitError) {
         return error(400, limitError);
+      }
+    }
+
+    // Validate nextToken parameter
+    if (nextToken) {
+      const nextTokenError = validateNextToken(nextToken);
+      if (nextTokenError) {
+        return error(400, nextTokenError);
       }
     }
 
