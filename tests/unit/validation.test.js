@@ -7,8 +7,15 @@ const {
   validateAssignee,
   validateLimit,
   validateNextToken,
+  stripHtmlTags,
+  stripControlCharacters,
+  sanitizeStringFields,
+  hasPrototypePollution,
+  containsPrototypePollutionKeys,
+  validateRequestBodySize,
   VALID_PRIORITIES,
-  VALID_STATUSES
+  VALID_STATUSES,
+  MAX_REQUEST_BODY_SIZE
 } = require('../../src/lib/validation');
 
 describe('Validation Module', () => {
@@ -395,6 +402,385 @@ describe('Validation Module', () => {
     test('should reject base64 that looks valid but contains invalid JSON', () => {
       const invalidJson = Buffer.from('{invalid: json}').toString('base64');
       expect(validateNextToken(invalidJson)).toBe('Invalid nextToken parameter');
+    });
+  });
+
+  describe('stripHtmlTags', () => {
+    test('should remove basic script tags', () => {
+      const input = '<script>alert("xss")</script>Hello';
+      expect(stripHtmlTags(input)).toBe('Hello');
+    });
+
+    test('should remove script tags with attributes', () => {
+      const input = '<script type="text/javascript">alert("xss")</script>World';
+      expect(stripHtmlTags(input)).toBe('World');
+    });
+
+    test('should remove img tags with onerror', () => {
+      const input = 'Test <img src="x" onerror="alert(1)"> text';
+      expect(stripHtmlTags(input)).toBe('Test  text');
+    });
+
+    test('should remove img tags with onload', () => {
+      const input = 'Before <img onload="alert(1)" src="valid.jpg"> After';
+      expect(stripHtmlTags(input)).toBe('Before  After');
+    });
+
+    test('should remove img tags with javascript: src', () => {
+      const input = 'Test <img src="javascript:alert(1)"> here';
+      expect(stripHtmlTags(input)).toBe('Test  here');
+    });
+
+    test('should remove inline event handlers', () => {
+      const input = '<div onclick="alert(1)">Click me</div>';
+      expect(stripHtmlTags(input)).toBe('Click me');
+    });
+
+    test('should remove various event handlers', () => {
+      const input = '<a onmouseover="alert(1)" href="#">Link</a>';
+      expect(stripHtmlTags(input)).toBe('Link');
+    });
+
+    test('should sanitize javascript: URLs in href', () => {
+      const input = '<a href="javascript:alert(1)">Click</a>';
+      expect(stripHtmlTags(input)).not.toContain('javascript:');
+    });
+
+    test('should remove HTML entities used for encoding', () => {
+      const input = '&#60;script&#62;alert(1)&#60;/script&#62;';
+      expect(stripHtmlTags(input)).toBe('scriptalert(1)/script');
+    });
+
+    test('should handle uppercase tags', () => {
+      const input = '<SCRIPT>alert("xss")</SCRIPT>Safe';
+      expect(stripHtmlTags(input)).toBe('Safe');
+    });
+
+    test('should handle mixed case tags', () => {
+      const input = '<ScRiPt>alert("xss")</sCrIpT>Test';
+      expect(stripHtmlTags(input)).toBe('Test');
+    });
+
+    test('should preserve non-HTML content', () => {
+      const input = 'Normal text without any HTML';
+      expect(stripHtmlTags(input)).toBe('Normal text without any HTML');
+    });
+
+    test('should handle empty string', () => {
+      expect(stripHtmlTags('')).toBe('');
+    });
+
+    test('should return non-string inputs unchanged', () => {
+      expect(stripHtmlTags(123)).toBe(123);
+      expect(stripHtmlTags(null)).toBe(null);
+      expect(stripHtmlTags(undefined)).toBe(undefined);
+    });
+
+    test('should handle multiple script tags', () => {
+      const input = '<script>a</script>Hello<script>b</script>World';
+      expect(stripHtmlTags(input)).toBe('HelloWorld');
+    });
+
+    test('should remove SVG with onload', () => {
+      const input = '<svg onload="alert(1)">content</svg>';
+      expect(stripHtmlTags(input)).toBe('content');
+    });
+
+    test('should handle bypass attempt with nested tags', () => {
+      const input = '<<script>script>alert(1)<</script>/script>';
+      const result = stripHtmlTags(input);
+      expect(result).not.toContain('<script>');
+    });
+
+    test('should handle bypass attempt with encoded angle brackets', () => {
+      const input = '&#x3c;script&#x3e;alert(1)&#x3c;/script&#x3e;';
+      const result = stripHtmlTags(input);
+      expect(result).not.toContain('&#x3c;');
+      expect(result).not.toContain('&#x3e;');
+    });
+  });
+
+  describe('stripControlCharacters', () => {
+    test('should remove null bytes', () => {
+      const input = 'Hello\x00World';
+      expect(stripControlCharacters(input)).toBe('HelloWorld');
+    });
+
+    test('should remove ASCII control characters except newline', () => {
+      const input = 'Test\x01\x02\x03\x04text';
+      expect(stripControlCharacters(input)).toBe('Testtext');
+    });
+
+    test('should preserve newlines (0x0A)', () => {
+      const input = 'Line1\nLine2';
+      expect(stripControlCharacters(input)).toBe('Line1\nLine2');
+    });
+
+    test('should remove tab characters (0x09)', () => {
+      const input = 'Hello\tWorld';
+      expect(stripControlCharacters(input)).toBe('HelloWorld');
+    });
+
+    test('should remove carriage returns (0x0D)', () => {
+      const input = 'Hello\rWorld';
+      expect(stripControlCharacters(input)).toBe('HelloWorld');
+    });
+
+    test('should remove vertical tab (0x0B)', () => {
+      const input = 'Hello\x0BWorld';
+      expect(stripControlCharacters(input)).toBe('HelloWorld');
+    });
+
+    test('should remove form feed (0x0C)', () => {
+      const input = 'Hello\x0CWorld';
+      expect(stripControlCharacters(input)).toBe('HelloWorld');
+    });
+
+    test('should handle empty string', () => {
+      expect(stripControlCharacters('')).toBe('');
+    });
+
+    test('should return non-string inputs unchanged', () => {
+      expect(stripControlCharacters(123)).toBe(123);
+      expect(stripControlCharacters(null)).toBe(null);
+      expect(stripControlCharacters(undefined)).toBe(undefined);
+    });
+
+    test('should remove escape character (0x1B)', () => {
+      const input = 'Test\x1BEscape';
+      expect(stripControlCharacters(input)).toBe('TestEscape');
+    });
+
+    test('should handle multiple control characters', () => {
+      const input = '\x00\x01Hello\x02\x03World\x04\x05';
+      expect(stripControlCharacters(input)).toBe('HelloWorld');
+    });
+
+    test('should preserve characters above 0x1F', () => {
+      const input = 'Hello World! @#$%^&*()';
+      expect(stripControlCharacters(input)).toBe('Hello World! @#$%^&*()');
+    });
+
+    test('should handle string with only control characters', () => {
+      const input = '\x00\x01\x02\x03';
+      expect(stripControlCharacters(input)).toBe('');
+    });
+
+    test('should preserve Unicode characters', () => {
+      const input = 'Hello 世界 🌍';
+      expect(stripControlCharacters(input)).toBe('Hello 世界 🌍');
+    });
+  });
+
+  describe('sanitizeStringFields', () => {
+    test('should sanitize string values in object', () => {
+      const input = { name: 'Test\x00Value', count: 5 };
+      const result = sanitizeStringFields(input);
+      expect(result.name).toBe('TestValue');
+      expect(result.count).toBe(5);
+    });
+
+    test('should handle nested objects', () => {
+      const input = { outer: { inner: 'Nested\x01Text' } };
+      const result = sanitizeStringFields(input);
+      expect(result.outer.inner).toBe('NestedText');
+    });
+
+    test('should preserve non-string values', () => {
+      const input = { 
+        num: 42, 
+        bool: true, 
+        arr: [1, 2, 3], 
+        nil: null 
+      };
+      const result = sanitizeStringFields(input);
+      expect(result.num).toBe(42);
+      expect(result.bool).toBe(true);
+      expect(result.arr).toEqual([1, 2, 3]);
+      expect(result.nil).toBe(null);
+    });
+
+    test('should return null for null input', () => {
+      expect(sanitizeStringFields(null)).toBe(null);
+    });
+
+    test('should return primitives unchanged', () => {
+      expect(sanitizeStringFields(123)).toBe(123);
+      expect(sanitizeStringFields('string')).toBe('string');
+    });
+  });
+
+  describe('hasPrototypePollution', () => {
+    test('should detect __proto__ key when set via Object.create', () => {
+      // Note: __proto__ as an object literal key doesn't create an enumerable property
+      // in JavaScript - it modifies the prototype chain instead.
+      // The containsPrototypePollutionKeys function handles __proto__ detection via string scanning.
+      // This test verifies hasPrototypePollution can detect it if somehow it becomes a real property.
+      const input = Object.create(null);
+      input['__proto__'] = { polluted: true };
+      expect(hasPrototypePollution(input)).toBe(true);
+    });
+
+    test('should detect constructor key', () => {
+      const input = { constructor: { prototype: { polluted: true } } };
+      expect(hasPrototypePollution(input)).toBe(true);
+    });
+
+    test('should detect prototype key', () => {
+      const input = { prototype: { polluted: true } };
+      expect(hasPrototypePollution(input)).toBe(true);
+    });
+
+    test('should detect nested constructor', () => {
+      const input = { data: { nested: { constructor: { polluted: true } } } };
+      expect(hasPrototypePollution(input)).toBe(true);
+    });
+
+    test('should detect constructor in array elements', () => {
+      const input = { items: [{ constructor: { polluted: true } }] };
+      expect(hasPrototypePollution(input)).toBe(true);
+    });
+
+    test('should return false for safe objects', () => {
+      const input = { name: 'test', value: 123, nested: { safe: true } };
+      expect(hasPrototypePollution(input)).toBe(false);
+    });
+
+    test('should return false for null', () => {
+      expect(hasPrototypePollution(null)).toBe(false);
+    });
+
+    test('should return false for primitives', () => {
+      expect(hasPrototypePollution(123)).toBe(false);
+      expect(hasPrototypePollution('string')).toBe(false);
+      expect(hasPrototypePollution(true)).toBe(false);
+    });
+
+    test('should return false for empty object', () => {
+      expect(hasPrototypePollution({})).toBe(false);
+    });
+
+    test('should return false for array without pollution', () => {
+      expect(hasPrototypePollution({ items: [1, 2, 3] })).toBe(false);
+    });
+
+    test('should detect constructor.prototype bypass attempt', () => {
+      const input = { constructor: { prototype: { polluted: true } } };
+      expect(hasPrototypePollution(input)).toBe(true);
+    });
+
+    test('should handle deeply nested constructor pollution attempts', () => {
+      const input = { 
+        level1: { 
+          level2: { 
+            level3: { 
+              constructor: { polluted: true } 
+            } 
+          } 
+        } 
+      };
+      expect(hasPrototypePollution(input)).toBe(true);
+    });
+  });
+
+  describe('validateRequestBodySize', () => {
+    test('should accept body under limit', () => {
+      const body = 'a'.repeat(1000);
+      expect(validateRequestBodySize(body)).toBeNull();
+    });
+
+    test('should accept body at exactly limit', () => {
+      const body = 'a'.repeat(MAX_REQUEST_BODY_SIZE);
+      expect(validateRequestBodySize(body)).toBeNull();
+    });
+
+    test('should reject body over limit', () => {
+      const body = 'a'.repeat(MAX_REQUEST_BODY_SIZE + 1);
+      expect(validateRequestBodySize(body)).toContain('exceeds maximum allowed size');
+    });
+
+    test('should accept null body', () => {
+      expect(validateRequestBodySize(null)).toBeNull();
+    });
+
+    test('should accept undefined body', () => {
+      expect(validateRequestBodySize(undefined)).toBeNull();
+    });
+
+    test('should handle empty string', () => {
+      expect(validateRequestBodySize('')).toBeNull();
+    });
+
+    test('should calculate size correctly for UTF-8 characters', () => {
+      // UTF-8 characters can be multiple bytes
+      const emoji = '🌍'.repeat(2600); // Each emoji is 4 bytes
+      expect(validateRequestBodySize(emoji)).toContain('exceeds maximum allowed size');
+    });
+
+    test('should reject significantly oversized body', () => {
+      const body = 'a'.repeat(50000);
+      expect(validateRequestBodySize(body)).toContain('exceeds maximum allowed size');
+    });
+  });
+
+  describe('containsPrototypePollutionKeys', () => {
+    test('should detect __proto__ key in JSON string', () => {
+      const input = '{"__proto__": {"polluted": true}}';
+      expect(containsPrototypePollutionKeys(input)).toBe(true);
+    });
+
+    test('should detect constructor key in JSON string', () => {
+      const input = '{"constructor": {"prototype": {"polluted": true}}}';
+      expect(containsPrototypePollutionKeys(input)).toBe(true);
+    });
+
+    test('should detect prototype key in JSON string', () => {
+      const input = '{"prototype": {"polluted": true}}';
+      expect(containsPrototypePollutionKeys(input)).toBe(true);
+    });
+
+    test('should detect nested __proto__ in JSON string', () => {
+      const input = '{"data": {"nested": {"__proto__": {"polluted": true}}}}';
+      expect(containsPrototypePollutionKeys(input)).toBe(true);
+    });
+
+    test('should return false for safe JSON string', () => {
+      const input = '{"name": "test", "value": 123}';
+      expect(containsPrototypePollutionKeys(input)).toBe(false);
+    });
+
+    test('should return false for null input', () => {
+      expect(containsPrototypePollutionKeys(null)).toBe(false);
+    });
+
+    test('should return false for non-string input', () => {
+      expect(containsPrototypePollutionKeys(123)).toBe(false);
+      expect(containsPrototypePollutionKeys({})).toBe(false);
+    });
+
+    test('should return false for empty string', () => {
+      expect(containsPrototypePollutionKeys('')).toBe(false);
+    });
+
+    test('should detect __proto__ with whitespace variations', () => {
+      const input = '{"__proto__"  :  {"polluted": true}}';
+      expect(containsPrototypePollutionKeys(input)).toBe(true);
+    });
+
+    test('should detect constructor with whitespace variations', () => {
+      const input = '{ "constructor" : {} }';
+      expect(containsPrototypePollutionKeys(input)).toBe(true);
+    });
+
+    test('should not match __proto__ as a value', () => {
+      const input = '{"key": "__proto__"}';
+      expect(containsPrototypePollutionKeys(input)).toBe(false);
+    });
+
+    test('should detect bypass attempt using different casing', () => {
+      // Case-insensitive check
+      const input = '{"__PROTO__": {"polluted": true}}';
+      expect(containsPrototypePollutionKeys(input)).toBe(true);
     });
   });
 });

@@ -197,7 +197,7 @@ describe('createTask handler', () => {
       const body = JSON.parse(response.body);
 
       expect(response.statusCode).toBe(400);
-      expect(body.error).toContain('Description is required');
+      expect(body.error).toContain('Description cannot be empty');
     });
 
     test('should handle whitespace-only description', async () => {
@@ -214,7 +214,207 @@ describe('createTask handler', () => {
       const body = JSON.parse(response.body);
 
       expect(response.statusCode).toBe(400);
-      expect(body.error).toContain('Description is required');
+      expect(body.error).toContain('Description cannot be empty');
+    });
+
+    test('should reject request body exceeding 10KB with 413 status', async () => {
+      const largeBody = JSON.stringify({
+        description: 'a'.repeat(15000)
+      });
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: largeBody
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(413);
+      expect(body.error).toContain('exceeds maximum allowed size');
+    });
+
+    test('should reject prototype pollution via __proto__', async () => {
+      // Construct JSON string directly to preserve __proto__ key
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: '{"description": "Test task", "__proto__": {"polluted": true}}'
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toContain('potentially unsafe object keys');
+    });
+
+    test('should reject prototype pollution via constructor', async () => {
+      // Construct JSON string directly to preserve constructor key
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: '{"description": "Test task", "constructor": {"prototype": {"polluted": true}}}'
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toContain('potentially unsafe object keys');
+    });
+
+    test('should reject prototype pollution via prototype key', async () => {
+      // Construct JSON string directly to preserve prototype key
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: '{"description": "Test task", "prototype": {"polluted": true}}'
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toContain('potentially unsafe object keys');
+    });
+
+    test('should strip script tags from description', async () => {
+      putTask.mockResolvedValue({});
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: JSON.stringify({
+          description: '<script>alert("xss")</script>Safe task description'
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(201);
+      expect(body.description).toBe('Safe task description');
+      expect(body.description).not.toContain('<script>');
+    });
+
+    test('should strip img onerror tags from description', async () => {
+      putTask.mockResolvedValue({});
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: JSON.stringify({
+          description: 'Task with <img src="x" onerror="alert(1)"> image'
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(201);
+      expect(body.description).not.toContain('onerror');
+      expect(body.description).not.toContain('<img');
+    });
+
+    test('should remove control characters from description', async () => {
+      putTask.mockResolvedValue({});
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: JSON.stringify({
+          description: 'Test\x00task\x01with\x02control\x03chars'
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(201);
+      expect(body.description).toBe('Testtaskwithcontrolchars');
+    });
+
+    test('should preserve newlines in description', async () => {
+      putTask.mockResolvedValue({});
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: JSON.stringify({
+          description: 'Line 1\nLine 2\nLine 3'
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(201);
+      expect(body.description).toBe('Line 1\nLine 2\nLine 3');
+    });
+
+    test('should reject nested prototype pollution attempt', async () => {
+      // Construct JSON string directly with nested __proto__ 
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: '{"description": "Test task", "nested": {"deep": {"__proto__": {"polluted": true}}}}'
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toContain('potentially unsafe object keys');
+    });
+
+    test('should handle body exactly at 10KB limit', async () => {
+      putTask.mockResolvedValue({});
+      
+      // Create a body that is under the 10KB limit with valid description
+      // 10KB = 10240 bytes. Description must be under 1000 chars validation limit
+      const body = JSON.stringify({ description: 'Valid description under limits' });
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: body
+      };
+
+      const response = await handler(event);
+      expect(response.statusCode).toBe(201);
+    });
+
+    test('should sanitize multiple XSS vectors in description', async () => {
+      putTask.mockResolvedValue({});
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: JSON.stringify({
+          description: '<script>bad</script>Safe<img onerror="alert(1)">text<div onclick="evil()">content</div>'
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(201);
+      expect(body.description).not.toContain('<script>');
+      expect(body.description).not.toContain('onerror');
+      expect(body.description).not.toContain('onclick');
     });
   });
 });

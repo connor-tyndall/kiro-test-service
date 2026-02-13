@@ -1,4 +1,10 @@
-const { validateTaskInput } = require('../lib/validation');
+const { 
+  validateTaskInput, 
+  stripHtmlTags, 
+  sanitizeStringFields, 
+  containsPrototypePollutionKeys,
+  validateRequestBodySize 
+} = require('../lib/validation');
 const { error, success, formatTask } = require('../lib/response');
 const { getTask, putTask } = require('../lib/dynamodb');
 const { validateApiKey } = require('../lib/auth');
@@ -23,12 +29,31 @@ exports.handler = async (event) => {
       return error(400, 'Task ID is required');
     }
 
+    // Check request body size limit
+    const bodySizeError = validateRequestBodySize(event.body);
+    if (bodySizeError) {
+      return error(413, bodySizeError);
+    }
+
+    // Check for prototype pollution attempts in raw JSON before parsing
+    if (containsPrototypePollutionKeys(event.body)) {
+      return error(400, 'Invalid request body: potentially unsafe object keys detected');
+    }
+
     // Parse request body
     let requestBody;
     try {
       requestBody = JSON.parse(event.body || '{}');
     } catch (parseError) {
       return error(400, 'Invalid JSON in request body');
+    }
+
+    // Sanitize string fields (remove control characters)
+    requestBody = sanitizeStringFields(requestBody);
+
+    // Sanitize description field (strip HTML tags)
+    if (requestBody.description !== undefined && requestBody.description !== null) {
+      requestBody.description = stripHtmlTags(requestBody.description);
     }
 
     // Check if task exists

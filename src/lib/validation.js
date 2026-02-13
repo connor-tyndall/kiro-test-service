@@ -2,6 +2,173 @@ const VALID_PRIORITIES = ['P0', 'P1', 'P2', 'P3', 'P4'];
 const VALID_STATUSES = ['open', 'in-progress', 'blocked', 'done'];
 const MAX_DESCRIPTION_LENGTH = 1000;
 const MAX_ASSIGNEE_LENGTH = 255;
+const MAX_REQUEST_BODY_SIZE = 10240; // 10KB
+
+/**
+ * Strips or escapes HTML tags and potentially dangerous script content from a string
+ * @param {string} str - The string to sanitize
+ * @returns {string} The sanitized string with HTML tags stripped
+ */
+function stripHtmlTags(str) {
+  if (typeof str !== 'string') {
+    return str;
+  }
+
+  let result = str;
+
+  // Remove script tags and their content
+  result = result.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+
+  // Remove various dangerous tags and patterns
+  // img tags with onerror, onload, or javascript: src
+  result = result.replace(/<img[^>]*(?:onerror|onload|src\s*=\s*["']?\s*javascript:)[^>]*>/gi, '');
+
+  // Remove event handlers from any remaining tags
+  result = result.replace(/\s*on\w+\s*=\s*["'][^"']*["']/gi, '');
+  result = result.replace(/\s*on\w+\s*=\s*[^\s>]+/gi, '');
+
+  // Remove javascript: URLs in href attributes
+  result = result.replace(/href\s*=\s*["']?\s*javascript:[^"'\s>]*/gi, 'href=""');
+
+  // Strip remaining HTML tags (but preserve content)
+  result = result.replace(/<\/?[a-z][a-z0-9]*\b[^>]*>/gi, '');
+
+  // Remove any remaining HTML entities that could be used for encoding attacks
+  result = result.replace(/&#x?[0-9a-f]+;?/gi, '');
+
+  return result;
+}
+
+/**
+ * Strips ASCII control characters from a string, preserving newlines (0x0A)
+ * @param {string} str - The string to sanitize
+ * @returns {string} The sanitized string with control characters removed
+ */
+function stripControlCharacters(str) {
+  if (typeof str !== 'string') {
+    return str;
+  }
+
+  // Remove control characters 0x00-0x1F except 0x0A (newline)
+  // eslint-disable-next-line no-control-regex
+  return str.replace(/[\x00-\x09\x0B-\x1F]/g, '');
+}
+
+/**
+ * Sanitizes all string fields in an object by stripping control characters
+ * @param {Object} obj - The object to sanitize
+ * @returns {Object} The sanitized object
+ */
+function sanitizeStringFields(obj) {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+
+  const result = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (typeof value === 'string') {
+      result[key] = stripControlCharacters(value);
+    } else if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+      result[key] = sanitizeStringFields(value);
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
+/**
+ * Checks if a parsed object contains prototype pollution attempts
+ * @param {any} obj - The object to check
+ * @param {Set} visited - Set of visited objects to prevent circular reference issues
+ * @returns {boolean} True if prototype pollution attempt detected
+ */
+function hasPrototypePollution(obj, visited = new Set()) {
+  if (obj === null || typeof obj !== 'object') {
+    return false;
+  }
+
+  // Prevent circular reference infinite loops
+  if (visited.has(obj)) {
+    return false;
+  }
+  visited.add(obj);
+
+  const dangerousKeys = ['__proto__', 'constructor', 'prototype'];
+
+  // Use Object.getOwnPropertyNames to get all properties including non-enumerable ones
+  const keys = Object.getOwnPropertyNames(obj);
+  
+  for (const key of keys) {
+    if (dangerousKeys.includes(key)) {
+      return true;
+    }
+
+    // Recursively check nested objects and arrays
+    try {
+      const value = obj[key];
+      if (value !== null && typeof value === 'object') {
+        if (Array.isArray(value)) {
+          for (const item of value) {
+            if (hasPrototypePollution(item, visited)) {
+              return true;
+            }
+          }
+        } else if (hasPrototypePollution(value, visited)) {
+          return true;
+        }
+      }
+    } catch (e) {
+      // Skip any properties that throw when accessed
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Checks if a JSON string contains prototype pollution attempts before parsing
+ * @param {string} jsonString - The raw JSON string to check
+ * @returns {boolean} True if prototype pollution attempt detected
+ */
+function containsPrototypePollutionKeys(jsonString) {
+  if (typeof jsonString !== 'string') {
+    return false;
+  }
+
+  // Check for dangerous keys in the raw JSON string
+  const dangerousPatterns = [
+    /"__proto__"\s*:/i,
+    /"constructor"\s*:/i,
+    /"prototype"\s*:/i
+  ];
+
+  for (const pattern of dangerousPatterns) {
+    if (pattern.test(jsonString)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Validates request body size against maximum allowed size
+ * @param {string} body - The raw request body string
+ * @returns {string|null} Error message if body exceeds limit, null otherwise
+ */
+function validateRequestBodySize(body) {
+  if (body === null || body === undefined) {
+    return null;
+  }
+
+  const bodyLength = Buffer.byteLength(body, 'utf8');
+  if (bodyLength > MAX_REQUEST_BODY_SIZE) {
+    return `Request body exceeds maximum allowed size of ${MAX_REQUEST_BODY_SIZE} bytes`;
+  }
+
+  return null;
+}
 
 /**
  * Validates task input data
@@ -230,6 +397,13 @@ module.exports = {
   validateAssignee,
   validateLimit,
   validateNextToken,
+  stripHtmlTags,
+  stripControlCharacters,
+  sanitizeStringFields,
+  hasPrototypePollution,
+  containsPrototypePollutionKeys,
+  validateRequestBodySize,
   VALID_PRIORITIES,
-  VALID_STATUSES
+  VALID_STATUSES,
+  MAX_REQUEST_BODY_SIZE
 };
