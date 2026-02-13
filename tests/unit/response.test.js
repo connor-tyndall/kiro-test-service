@@ -158,4 +158,60 @@ describe('Response Module', () => {
       expect(formatted.updatedAt).toBe(timestamp);
     });
   });
+
+  describe('Edge Cases', () => {
+    test('should handle success with null body', () => {
+      const response = success(200, null);
+
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toBe('null');
+    });
+
+    test('should handle error with empty message', () => {
+      const response = error(400, '');
+
+      expect(response.statusCode).toBe(400);
+      expect(JSON.parse(response.body).error).toBe('');
+    });
+
+    test('should handle success with 204 No Content status', () => {
+      const response = success(204, '');
+
+      expect(response.statusCode).toBe(204);
+      expect(response.body).toBe('""');
+    });
+
+    test('should handle formatTask with empty object', () => {
+      const formatted = formatTask({});
+
+      expect(formatted.id).toBeUndefined();
+      expect(formatted.description).toBeUndefined();
+      expect(formatted.assignee).toBeNull();
+      expect(formatted.dueDate).toBeNull();
+    });
+
+    test('should handle formatTask with extra fields (excludes DynamoDB keys)', () => {
+      const taskItem = {
+        PK: 'TASK#123',
+        SK: 'TASK#123',
+        GSI1PK: 'STATUS#open',
+        GSI1SK: 'TASK#123',
+        id: '123',
+        description: 'Task',
+        priority: 'P2',
+        status: 'open',
+        extraField: 'should be excluded',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z'
+      };
+
+      const formatted = formatTask(taskItem);
+
+      expect(formatted.PK).toBeUndefined();
+      expect(formatted.SK).toBeUndefined();
+      expect(formatted.GSI1PK).toBeUndefined();
+      expect(formatted.extraField).toBeUndefined();
+      expect(formatted.id).toBe('123');
+    });
+  });
 });

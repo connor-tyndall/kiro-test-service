@@ -104,4 +104,46 @@ describe('Auth Module', () => {
       expect(JSON.parse(result.body).error).toBe('Missing API key');
     });
   });
+
+  describe('Edge Cases', () => {
+    test('should handle API key with leading/trailing whitespace', () => {
+      const event = {
+        headers: {
+          'x-api-key': ' test-api-key-12345 '
+        }
+      };
+      const result = validateApiKey(event);
+      expect(result.statusCode).toBe(401);
+      expect(JSON.parse(result.body).error).toBe('Invalid API key');
+    });
+
+    test('should handle empty object event', () => {
+      const result = validateApiKey({});
+      expect(result.statusCode).toBe(401);
+      expect(JSON.parse(result.body).error).toBe('Missing API key');
+    });
+
+    test('should be case-sensitive for API key value', () => {
+      const event = {
+        headers: {
+          'x-api-key': 'TEST-API-KEY-12345'
+        }
+      };
+      const result = validateApiKey(event);
+      expect(result.statusCode).toBe(401);
+      expect(JSON.parse(result.body).error).toBe('Invalid API key');
+    });
+
+    test('should handle API key in uppercase header name', () => {
+      const event = {
+        headers: {
+          'X-API-KEY': 'test-api-key-12345'
+        }
+      };
+      const result = validateApiKey(event);
+      // This should fail because only x-api-key and X-Api-Key are checked
+      expect(result.statusCode).toBe(401);
+      expect(JSON.parse(result.body).error).toBe('Missing API key');
+    });
+  });
 });

@@ -179,4 +179,128 @@ describe('updateTask handler', () => {
     expect(response.statusCode).toBe(401);
     expect(body.error).toBe('Invalid API key');
   });
+
+  describe('Edge Cases', () => {
+    test('should handle null pathParameters', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        pathParameters: null,
+        body: JSON.stringify({ description: 'Updated' })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toBe('Task ID is required');
+    });
+
+    test('should handle missing headers object', async () => {
+      const event = {
+        pathParameters: { id: '123' },
+        body: JSON.stringify({ description: 'Updated' })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(401);
+      expect(body.error).toBe('Missing API key');
+    });
+
+    test('should handle null body as no-op update', async () => {
+      getTask.mockResolvedValue(mockExistingTask);
+      putTask.mockResolvedValue({});
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        pathParameters: { id: '123' },
+        body: null
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.description).toBe(mockExistingTask.description);
+    });
+
+    test('should handle empty string body as no-op update', async () => {
+      getTask.mockResolvedValue(mockExistingTask);
+      putTask.mockResolvedValue({});
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        pathParameters: { id: '123' },
+        body: ''
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.description).toBe(mockExistingTask.description);
+    });
+
+    test('should handle DynamoDB error', async () => {
+      getTask.mockResolvedValue(mockExistingTask);
+      putTask.mockRejectedValue(new Error('DynamoDB error'));
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        pathParameters: { id: '123' },
+        body: JSON.stringify({ description: 'Updated' })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(500);
+      expect(body.error).toBe('Internal server error: updating task');
+    });
+
+    test('should handle empty string task ID', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        pathParameters: { id: '' },
+        body: JSON.stringify({ description: 'Updated' })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toBe('Task ID is required');
+    });
+
+    test('should handle invalid assignee email format in update', async () => {
+      getTask.mockResolvedValue(mockExistingTask);
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        pathParameters: { id: '123' },
+        body: JSON.stringify({
+          assignee: 'not-an-email'
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toContain('valid email');
+    });
+  });
 });

@@ -166,4 +166,105 @@ describe('createTask handler', () => {
     expect(response.statusCode).toBe(401);
     expect(body.error).toBe('Invalid API key');
   });
+
+  describe('Edge Cases', () => {
+    test('should handle null body as empty object', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: null
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toContain('Description is required');
+    });
+
+    test('should handle empty string body as empty object', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: ''
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toContain('Description is required');
+    });
+
+    test('should handle whitespace-only description', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: JSON.stringify({
+          description: '   '
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toContain('Description cannot be empty');
+    });
+
+    test('should handle missing headers object', async () => {
+      const event = {
+        body: JSON.stringify({
+          description: 'Test task'
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(401);
+      expect(body.error).toBe('Missing API key');
+    });
+
+    test('should handle invalid assignee email format', async () => {
+      putTask.mockResolvedValue({});
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: JSON.stringify({
+          description: 'Test task',
+          assignee: 'not-an-email'
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toContain('valid email');
+    });
+
+    test('should handle invalid date format', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: JSON.stringify({
+          description: 'Test task',
+          dueDate: 'invalid-date'
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toContain('ISO 8601');
+    });
+  });
 });
