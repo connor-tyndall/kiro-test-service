@@ -53,11 +53,11 @@ describe('Response Module', () => {
       expect(JSON.parse(response.body).error).toBe(message);
     });
 
-    test('should handle 503 error', () => {
-      const message = 'Service temporarily unavailable';
-      const response = error(503, message);
+    test('should handle 500 error', () => {
+      const message = 'Internal server error: operation';
+      const response = error(500, message);
 
-      expect(response.statusCode).toBe(503);
+      expect(response.statusCode).toBe(500);
       expect(JSON.parse(response.body).error).toBe(message);
     });
 

@@ -82,7 +82,7 @@ const updateTaskHandler = async (event) => {
     return success(200, formattedTask);
   } catch (err) {
     console.error('Error updating task:', err);
-    return error(503, 'Service temporarily unavailable');
+    return error(500, 'Internal server error: updating task');
   }
 };
 
