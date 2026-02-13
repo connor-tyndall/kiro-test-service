@@ -78,8 +78,7 @@ export const handler = async (event: APIGatewayEvent): Promise<LambdaResponse> =
     await putTask(updatedTask);
 
     // Return updated task
-    const formattedTask = formatTask(updatedTask as TaskItem);
-    return success(200, formattedTask!);
+    return success(200, formatTask(updatedTask as TaskItem));
   } catch (err) {
     console.error('Error updating task:', err);
     return error(500, 'Internal server error: updating task');
