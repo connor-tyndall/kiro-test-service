@@ -51,6 +51,6 @@ exports.handler = async (event) => {
     return success(201, task);
   } catch (err) {
     console.error('Error creating task:', err);
-    return error(503, 'Service temporarily unavailable');
+    return error(500, 'Internal server error: creating task');
   }
 };

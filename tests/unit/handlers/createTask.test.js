@@ -131,8 +131,8 @@ describe('createTask handler', () => {
     const response = await handler(event);
     const body = JSON.parse(response.body);
 
-    expect(response.statusCode).toBe(503);
-    expect(body.error).toBe('Service temporarily unavailable');
+    expect(response.statusCode).toBe(500);
+    expect(body.error).toBe('Internal server error: creating task');
   });
 
   test('should return 401 for missing API key', async () => {
@@ -165,5 +165,56 @@ describe('createTask handler', () => {
 
     expect(response.statusCode).toBe(401);
     expect(body.error).toBe('Invalid API key');
+  });
+
+  describe('Edge Cases', () => {
+    test('should handle null body', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: null
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toContain('Description is required');
+    });
+
+    test('should handle empty string description', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: JSON.stringify({
+          description: ''
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toContain('Description is required');
+    });
+
+    test('should handle whitespace-only description', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: JSON.stringify({
+          description: '   '
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toContain('Description is required');
+    });
   });
 });
