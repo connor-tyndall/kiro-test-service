@@ -41,6 +41,6 @@ exports.handler = async (event) => {
     };
   } catch (err) {
     console.error('Error deleting task:', err);
-    return error(503, 'Service temporarily unavailable');
+    return error(500, 'Internal server error: deleting task');
   }
 };
