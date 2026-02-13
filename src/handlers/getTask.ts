@@ -31,7 +31,11 @@ export const handler = async (event: APIGatewayEvent): Promise<LambdaResponse> =
     }
 
     // Format and return task
-    return success(200, formatTask(task));
+    const formattedTask = formatTask(task);
+    if (!formattedTask) {
+      return error(500, 'Failed to format task');
+    }
+    return success(200, formattedTask);
   } catch (err) {
     console.error('Error retrieving task:', err);
     return error(500, 'Internal server error: retrieving task');

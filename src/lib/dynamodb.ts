@@ -8,6 +8,15 @@ const docClient = DynamoDBDocumentClient.from(client);
 const TABLE_NAME = process.env.TABLE_NAME || 'engineering-tasks';
 
 /**
+ * Type guard to validate if an item is a valid TaskItem
+ * @param item - The item to validate
+ * @returns True if the item is a valid TaskItem
+ */
+function isTaskItem(item: Record<string, unknown>): item is TaskItem {
+  return item && typeof item.PK === 'string' && typeof item.SK === 'string';
+}
+
+/**
  * Puts a task in DynamoDB (create or update)
  * @param task - Task object to store
  * @returns The stored task
@@ -47,7 +56,13 @@ export async function getTask(id: string): Promise<TaskItem | null> {
       }
     }));
 
-    return (result.Item as TaskItem) || null;
+    if (!result.Item) {
+      return null;
+    }
+    if (!isTaskItem(result.Item)) {
+      return null;
+    }
+    return result.Item;
   } catch (err) {
     console.error('DynamoDB getTask error:', err);
     throw new Error('Internal server error: getting task');
@@ -107,7 +122,7 @@ export async function scanTasks(limit?: number, nextToken?: string): Promise<Que
     const result = await docClient.send(new ScanCommand(params));
 
     return {
-      items: (result.Items as TaskItem[]) || [],
+      items: (result.Items || []).filter((item): item is TaskItem => isTaskItem(item as Record<string, unknown>)),
       nextToken: result.LastEvaluatedKey 
         ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64')
         : null
@@ -154,7 +169,7 @@ export async function queryTasksByAssignee(assignee: string, limit?: number, nex
     const result = await docClient.send(new QueryCommand(params));
 
     return {
-      items: (result.Items as TaskItem[]) || [],
+      items: (result.Items || []).filter((item): item is TaskItem => isTaskItem(item as Record<string, unknown>)),
       nextToken: result.LastEvaluatedKey 
         ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64')
         : null
@@ -205,7 +220,7 @@ export async function queryTasksByStatus(status: string, limit?: number, nextTok
     const result = await docClient.send(new QueryCommand(params));
 
     return {
-      items: (result.Items as TaskItem[]) || [],
+      items: (result.Items || []).filter((item): item is TaskItem => isTaskItem(item as Record<string, unknown>)),
       nextToken: result.LastEvaluatedKey 
         ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64')
         : null
@@ -252,7 +267,7 @@ export async function queryTasksByPriority(priority: string, limit?: number, nex
     const result = await docClient.send(new QueryCommand(params));
 
     return {
-      items: (result.Items as TaskItem[]) || [],
+      items: (result.Items || []).filter((item): item is TaskItem => isTaskItem(item as Record<string, unknown>)),
       nextToken: result.LastEvaluatedKey 
         ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64')
         : null
