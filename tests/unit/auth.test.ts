@@ -127,4 +127,28 @@ describe('Auth Module', () => {
       expect(JSON.parse(result!.body).error).toBe('Invalid API key');
     });
   });
+
+  describe('Edge Cases', () => {
+    test('should handle undefined event', () => {
+      const result = validateApiKey(undefined);
+      expect(result.statusCode).toBe(401);
+      expect(JSON.parse(result.body).error).toBe('Missing API key');
+    });
+
+    test('should handle null event', () => {
+      const result = validateApiKey(null);
+      expect(result.statusCode).toBe(401);
+      expect(JSON.parse(result.body).error).toBe('Missing API key');
+    });
+
+    test('should handle whitespace-only API key', () => {
+      const event = {
+        headers: {
+          'x-api-key': '   '
+        }
+      };
+      const result = validateApiKey(event);
+      expect(result.statusCode).toBe(401);
+    });
+  });
 });

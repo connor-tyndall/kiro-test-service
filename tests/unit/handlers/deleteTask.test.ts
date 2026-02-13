@@ -146,6 +146,21 @@ describe('deleteTask handler', () => {
       const event: APIGatewayEvent = {
         headers: {
           'x-api-key': 'test-api-key'
+        },
+        pathParameters: null
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toBe('Task ID is required');
+    });
+
+    test('should handle undefined pathParameters', async () => {
+      const event: APIGatewayEvent = {
+        headers: {
+          'x-api-key': 'test-api-key'
         }
       };
 
@@ -154,6 +169,23 @@ describe('deleteTask handler', () => {
 
       expect(response.statusCode).toBe(400);
       expect(body.error).toBe('Task ID is required');
+    });
+
+    test('should handle getTask error during existence check', async () => {
+      mockedGetTask.mockRejectedValue(new Error('DynamoDB connection error'));
+
+      const event: APIGatewayEvent = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        pathParameters: { id: '123' }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(500);
+      expect(body.error).toBe('Internal server error: deleting task');
     });
   });
 });

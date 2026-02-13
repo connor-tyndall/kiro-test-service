@@ -187,4 +187,42 @@ describe('Response Module', () => {
       expect(JSON.parse(response.body).error).toBe(message);
     });
   });
+
+  describe('Edge Cases', () => {
+    test('should handle success with null body', () => {
+      const response = success(200, null);
+      
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toBe('null');
+    });
+
+    test('should handle error with empty message', () => {
+      const response = error(400, '');
+      
+      expect(response.statusCode).toBe(400);
+      expect(JSON.parse(response.body).error).toBe('');
+    });
+
+    test('should handle formatTask with empty object', () => {
+      const formatted = formatTask({});
+      
+      expect(formatted).toBeDefined();
+      expect(formatted.id).toBeUndefined();
+    });
+
+    test('should handle success with nested objects', () => {
+      const body = {
+        task: {
+          id: '123',
+          nested: {
+            value: 'deep'
+          }
+        }
+      };
+      const response = success(200, body);
+
+      expect(response.statusCode).toBe(200);
+      expect(JSON.parse(response.body)).toEqual(body);
+    });
+  });
 });
