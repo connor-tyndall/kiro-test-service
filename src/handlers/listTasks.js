@@ -46,8 +46,8 @@ const listTasksHandler = async (event) => {
       }
     }
 
-    // Validate nextToken parameter
-    if (nextToken) {
+    // Validate nextToken parameter (check for undefined to handle empty string case)
+    if (nextToken !== undefined) {
       const nextTokenError = validateNextToken(nextToken);
       if (nextTokenError) {
         return error(400, nextTokenError);

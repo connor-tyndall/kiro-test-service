@@ -1,0 +1,39 @@
+# Dependencies
+node_modules
+
+# Version control
+.git
+.gitignore
+
+# IDE and editor
+.vscode
+.idea
+
+# Test coverage
+coverage
+
+# Environment files
+.env
+.env.local
+.env*.local
+
+# Log files
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Terraform state
+terraform/.terraform
+terraform/*.tfstate
+terraform/*.tfstate.backup
+
+# Documentation (not needed in image)
+*.md
+HANDOFF.md
+IMPLEMENTATION_SUMMARY.md
+PAGINATION.md
+QUICK_START.md
+README.md
