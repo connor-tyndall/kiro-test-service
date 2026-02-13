@@ -79,6 +79,7 @@ describe('Response Module', () => {
         priority: 'P1',
         status: 'open',
         dueDate: '2024-12-31',
+        tags: ['bug', 'frontend'],
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z'
       };
@@ -92,6 +93,7 @@ describe('Response Module', () => {
         priority: 'P1',
         status: 'open',
         dueDate: '2024-12-31',
+        tags: ['bug', 'frontend'],
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z'
       });
@@ -111,6 +113,7 @@ describe('Response Module', () => {
 
       expect(formatted.assignee).toBeNull();
       expect(formatted.dueDate).toBeNull();
+      expect(formatted.tags).toEqual([]);
       expect(formatted.id).toBe('123');
       expect(formatted.description).toBe('Minimal task');
     });
@@ -156,6 +159,69 @@ describe('Response Module', () => {
 
       expect(formatted.createdAt).toBe(timestamp);
       expect(formatted.updatedAt).toBe(timestamp);
+    });
+
+    test('should include tags as empty array when undefined', () => {
+      const taskItem = {
+        id: '123',
+        description: 'Task',
+        priority: 'P2',
+        status: 'open',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z'
+      };
+
+      const formatted = formatTask(taskItem);
+
+      expect(formatted.tags).toEqual([]);
+    });
+
+    test('should include tags as empty array when null', () => {
+      const taskItem = {
+        id: '123',
+        description: 'Task',
+        priority: 'P2',
+        status: 'open',
+        tags: null,
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z'
+      };
+
+      const formatted = formatTask(taskItem);
+
+      expect(formatted.tags).toEqual([]);
+    });
+
+    test('should preserve existing tags array', () => {
+      const taskItem = {
+        id: '123',
+        description: 'Task',
+        priority: 'P2',
+        status: 'open',
+        tags: ['bug', 'high-priority', 'frontend'],
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z'
+      };
+
+      const formatted = formatTask(taskItem);
+
+      expect(formatted.tags).toEqual(['bug', 'high-priority', 'frontend']);
+    });
+
+    test('should preserve empty tags array', () => {
+      const taskItem = {
+        id: '123',
+        description: 'Task',
+        priority: 'P2',
+        status: 'open',
+        tags: [],
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z'
+      };
+
+      const formatted = formatTask(taskItem);
+
+      expect(formatted.tags).toEqual([]);
     });
   });
 

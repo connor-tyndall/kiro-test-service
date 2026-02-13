@@ -1,5 +1,5 @@
 const { error, success, formatTask } = require('../lib/response');
-const { validatePriority, validateStatus, validateDateFormat, validateLimit, validateNextToken } = require('../lib/validation');
+const { validatePriority, validateStatus, validateDateFormat, validateLimit, validateNextToken, validateTags, TAG_PATTERN } = require('../lib/validation');
 const { 
   scanTasks, 
   queryTasksByAssignee, 
@@ -23,7 +23,7 @@ exports.handler = async (event) => {
   try {
     // Extract query parameters
     const queryParams = event.queryStringParameters || {};
-    const { assignee, priority, status, dueDateBefore, limit, nextToken } = queryParams;
+    const { assignee, priority, status, dueDateBefore, limit, nextToken, tag } = queryParams;
 
     // Validate filter parameters
     if (priority && validatePriority(priority)) {
@@ -34,6 +34,16 @@ exports.handler = async (event) => {
     }
     if (dueDateBefore && validateDateFormat(dueDateBefore)) {
       return error(400, validateDateFormat(dueDateBefore));
+    }
+    
+    // Validate tag parameter
+    if (tag !== undefined && tag !== null) {
+      if (typeof tag !== 'string' || tag.length === 0) {
+        return error(400, 'Tag filter must be a non-empty string');
+      }
+      if (!TAG_PATTERN.test(tag)) {
+        return error(400, 'Tag must contain only lowercase letters, numbers, and hyphens');
+      }
     }
 
     // Validate and parse limit
@@ -103,6 +113,14 @@ exports.handler = async (event) => {
         if (!task.dueDate) return false;
         const taskDate = new Date(task.dueDate);
         return taskDate <= filterDate;
+      });
+    }
+
+    // Apply tag filter in application code
+    if (tag) {
+      result.items = result.items.filter(task => {
+        if (!task.tags || !Array.isArray(task.tags)) return false;
+        return task.tags.includes(tag);
       });
     }
 

@@ -49,6 +49,7 @@ function formatTask(taskItem) {
     priority: taskItem.priority,
     status: taskItem.status,
     dueDate: taskItem.dueDate || null,
+    tags: taskItem.tags || [],
     createdAt: taskItem.createdAt,
     updatedAt: taskItem.updatedAt
   };

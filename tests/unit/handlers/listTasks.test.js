@@ -541,4 +541,279 @@ describe('listTasks handler', () => {
       expect(body.error).toBe('Invalid nextToken parameter');
     });
   });
+
+  describe('Tag Filtering', () => {
+    const mockTasksWithTags = [
+      {
+        id: '1',
+        description: 'Task 1',
+        assignee: 'user1@example.com',
+        priority: 'P1',
+        status: 'open',
+        tags: ['bug', 'frontend'],
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z'
+      },
+      {
+        id: '2',
+        description: 'Task 2',
+        assignee: 'user2@example.com',
+        priority: 'P2',
+        status: 'in-progress',
+        tags: ['bug', 'backend'],
+        createdAt: '2024-01-02T00:00:00.000Z',
+        updatedAt: '2024-01-02T00:00:00.000Z'
+      },
+      {
+        id: '3',
+        description: 'Task 3',
+        assignee: 'user1@example.com',
+        priority: 'P1',
+        status: 'open',
+        tags: ['feature'],
+        createdAt: '2024-01-03T00:00:00.000Z',
+        updatedAt: '2024-01-03T00:00:00.000Z'
+      },
+      {
+        id: '4',
+        description: 'Task 4',
+        assignee: 'user2@example.com',
+        priority: 'P3',
+        status: 'done',
+        tags: [],
+        createdAt: '2024-01-04T00:00:00.000Z',
+        updatedAt: '2024-01-04T00:00:00.000Z'
+      }
+    ];
+
+    test('should filter tasks by tag', async () => {
+      scanTasks.mockResolvedValue({ items: mockTasksWithTags, nextToken: null });
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          tag: 'bug'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.tasks).toHaveLength(2);
+      expect(body.tasks.every(t => t.tags.includes('bug'))).toBe(true);
+    });
+
+    test('should filter tasks by unique tag', async () => {
+      scanTasks.mockResolvedValue({ items: mockTasksWithTags, nextToken: null });
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          tag: 'feature'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.tasks).toHaveLength(1);
+      expect(body.tasks[0].id).toBe('3');
+    });
+
+    test('should return empty array when no tasks match tag', async () => {
+      scanTasks.mockResolvedValue({ items: mockTasksWithTags, nextToken: null });
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          tag: 'nonexistent-tag'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.tasks).toHaveLength(0);
+    });
+
+    test('should exclude tasks with empty tags array', async () => {
+      scanTasks.mockResolvedValue({ items: mockTasksWithTags, nextToken: null });
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          tag: 'bug'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.tasks.find(t => t.id === '4')).toBeUndefined();
+    });
+
+    test('should exclude tasks without tags field', async () => {
+      const tasksWithMissingTags = [
+        { ...mockTasksWithTags[0] },
+        { id: '5', description: 'Task without tags', priority: 'P1', status: 'open', createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' }
+      ];
+      scanTasks.mockResolvedValue({ items: tasksWithMissingTags, nextToken: null });
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          tag: 'bug'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.tasks).toHaveLength(1);
+      expect(body.tasks[0].id).toBe('1');
+    });
+
+    test('should combine tag filter with other filters', async () => {
+      queryTasksByAssignee.mockResolvedValue({ items: [mockTasksWithTags[0], mockTasksWithTags[2]], nextToken: null });
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          assignee: 'user1@example.com',
+          tag: 'bug'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.tasks).toHaveLength(1);
+      expect(body.tasks[0].id).toBe('1');
+    });
+
+    test('should combine tag filter with status filter', async () => {
+      queryTasksByStatus.mockResolvedValue({ items: [mockTasksWithTags[0], mockTasksWithTags[2]], nextToken: null });
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          status: 'open',
+          tag: 'frontend'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.tasks).toHaveLength(1);
+      expect(body.tasks[0].id).toBe('1');
+    });
+
+    test('should reject invalid tag format with uppercase', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          tag: 'Bug'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toBe('Tag must contain only lowercase letters, numbers, and hyphens');
+    });
+
+    test('should reject tag with spaces', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          tag: 'high priority'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toBe('Tag must contain only lowercase letters, numbers, and hyphens');
+    });
+
+    test('should reject empty tag parameter', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          tag: ''
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toBe('Tag filter must be a non-empty string');
+    });
+
+    test('should accept valid tag with numbers', async () => {
+      scanTasks.mockResolvedValue({ items: mockTasksWithTags, nextToken: null });
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          tag: 'sprint-15'
+        }
+      };
+
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(200);
+    });
+
+    test('should include tags in response', async () => {
+      scanTasks.mockResolvedValue({ items: mockTasksWithTags, nextToken: null });
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: null
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.tasks[0].tags).toBeDefined();
+      expect(Array.isArray(body.tasks[0].tags)).toBe(true);
+    });
+  });
 });

@@ -252,4 +252,197 @@ describe('updateTask handler', () => {
       expect(body.error).toBe('Internal server error: updating task');
     });
   });
+
+  describe('Tags', () => {
+    test('should update task tags', async () => {
+      getTask.mockResolvedValue(mockExistingTask);
+      putTask.mockResolvedValue({});
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        pathParameters: { id: '123' },
+        body: JSON.stringify({
+          tags: ['bug', 'high-priority']
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.tags).toEqual(['bug', 'high-priority']);
+    });
+
+    test('should add tags to task that had no tags', async () => {
+      const taskWithoutTags = { ...mockExistingTask };
+      delete taskWithoutTags.tags;
+      getTask.mockResolvedValue(taskWithoutTags);
+      putTask.mockResolvedValue({});
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        pathParameters: { id: '123' },
+        body: JSON.stringify({
+          tags: ['new-tag']
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.tags).toEqual(['new-tag']);
+    });
+
+    test('should clear tags by setting empty array', async () => {
+      const taskWithTags = { ...mockExistingTask, tags: ['bug', 'frontend'] };
+      getTask.mockResolvedValue(taskWithTags);
+      putTask.mockResolvedValue({});
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        pathParameters: { id: '123' },
+        body: JSON.stringify({
+          tags: []
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.tags).toEqual([]);
+    });
+
+    test('should preserve existing tags when not updated', async () => {
+      const taskWithTags = { ...mockExistingTask, tags: ['existing-tag'] };
+      getTask.mockResolvedValue(taskWithTags);
+      putTask.mockResolvedValue({});
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        pathParameters: { id: '123' },
+        body: JSON.stringify({
+          description: 'Updated description'
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.tags).toEqual(['existing-tag']);
+    });
+
+    test('should reject update with too many tags', async () => {
+      getTask.mockResolvedValue(mockExistingTask);
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        pathParameters: { id: '123' },
+        body: JSON.stringify({
+          tags: ['tag1', 'tag2', 'tag3', 'tag4', 'tag5', 'tag6']
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toContain('Maximum 5 tags allowed');
+    });
+
+    test('should reject update with invalid tag format', async () => {
+      getTask.mockResolvedValue(mockExistingTask);
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        pathParameters: { id: '123' },
+        body: JSON.stringify({
+          tags: ['Invalid Tag']
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toContain('Tag must contain only lowercase letters, numbers, and hyphens');
+    });
+
+    test('should reject update with tag exceeding max length', async () => {
+      getTask.mockResolvedValue(mockExistingTask);
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        pathParameters: { id: '123' },
+        body: JSON.stringify({
+          tags: ['a'.repeat(31)]
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toContain('Tag must not exceed 30 characters');
+    });
+
+    test('should reject update with non-array tags', async () => {
+      getTask.mockResolvedValue(mockExistingTask);
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        pathParameters: { id: '123' },
+        body: JSON.stringify({
+          tags: 'bug'
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toContain('Tags must be an array');
+    });
+
+    test('should persist updated tags to DynamoDB', async () => {
+      getTask.mockResolvedValue(mockExistingTask);
+      putTask.mockResolvedValue({});
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        pathParameters: { id: '123' },
+        body: JSON.stringify({
+          tags: ['updated-tag', 'new-tag']
+        })
+      };
+
+      await handler(event);
+
+      expect(putTask).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tags: ['updated-tag', 'new-tag']
+        })
+      );
+    });
+  });
 });

@@ -72,6 +72,9 @@ exports.handler = async (event) => {
     if (requestBody.dueDate !== undefined) {
       updatedTask.dueDate = requestBody.dueDate;
     }
+    if (requestBody.tags !== undefined) {
+      updatedTask.tags = requestBody.tags;
+    }
 
     // Persist to DynamoDB
     await putTask(updatedTask);

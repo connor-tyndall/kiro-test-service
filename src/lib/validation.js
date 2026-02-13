@@ -2,6 +2,9 @@ const VALID_PRIORITIES = ['P0', 'P1', 'P2', 'P3', 'P4'];
 const VALID_STATUSES = ['open', 'in-progress', 'blocked', 'done'];
 const MAX_DESCRIPTION_LENGTH = 1000;
 const MAX_ASSIGNEE_LENGTH = 255;
+const MAX_TAGS_PER_TASK = 5;
+const MAX_TAG_LENGTH = 30;
+const TAG_PATTERN = /^[a-z0-9-]+$/;
 
 /**
  * Validates task input data
@@ -46,6 +49,14 @@ function validateTaskInput(data) {
     const assigneeError = validateAssignee(data.assignee);
     if (assigneeError) {
       errors.push(assigneeError);
+    }
+  }
+
+  // Validate tags if provided
+  if (data.tags !== undefined && data.tags !== null) {
+    const tagsError = validateTags(data.tags);
+    if (tagsError) {
+      errors.push(tagsError);
     }
   }
 
@@ -163,6 +174,41 @@ function validateAssignee(assignee) {
 }
 
 /**
+ * Validates tags field (array of strings)
+ * @param {Array} tags - Tags array to validate
+ * @returns {string|null} Error message or null if valid
+ */
+function validateTags(tags) {
+  if (!Array.isArray(tags)) {
+    return 'Tags must be an array';
+  }
+
+  if (tags.length > MAX_TAGS_PER_TASK) {
+    return `Maximum ${MAX_TAGS_PER_TASK} tags allowed per task`;
+  }
+
+  for (const tag of tags) {
+    if (typeof tag !== 'string') {
+      return 'Each tag must be a string';
+    }
+
+    if (tag.length === 0) {
+      return 'Tag cannot be empty';
+    }
+
+    if (tag.length > MAX_TAG_LENGTH) {
+      return `Tag must not exceed ${MAX_TAG_LENGTH} characters`;
+    }
+
+    if (!TAG_PATTERN.test(tag)) {
+      return 'Tag must contain only lowercase letters, numbers, and hyphens';
+    }
+  }
+
+  return null;
+}
+
+/**
  * Validates pagination limit parameter
  * @param {string|number} limit - Limit value to validate
  * @returns {string|null} Error message or null if valid
@@ -228,8 +274,12 @@ module.exports = {
   validateDateFormat,
   validateDescription,
   validateAssignee,
+  validateTags,
   validateLimit,
   validateNextToken,
   VALID_PRIORITIES,
-  VALID_STATUSES
+  VALID_STATUSES,
+  MAX_TAGS_PER_TASK,
+  MAX_TAG_LENGTH,
+  TAG_PATTERN
 };

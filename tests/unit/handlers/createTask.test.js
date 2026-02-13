@@ -217,4 +217,160 @@ describe('createTask handler', () => {
       expect(body.error).toContain('Description is required');
     });
   });
+
+  describe('Tags', () => {
+    test('should create task with tags', async () => {
+      putTask.mockResolvedValue({});
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: JSON.stringify({
+          description: 'Test task with tags',
+          tags: ['bug', 'high-priority', 'frontend']
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(201);
+      expect(body.tags).toEqual(['bug', 'high-priority', 'frontend']);
+    });
+
+    test('should create task with empty tags array', async () => {
+      putTask.mockResolvedValue({});
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: JSON.stringify({
+          description: 'Test task',
+          tags: []
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(201);
+      expect(body.tags).toEqual([]);
+    });
+
+    test('should create task without tags (default to empty array)', async () => {
+      putTask.mockResolvedValue({});
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: JSON.stringify({
+          description: 'Test task'
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(201);
+      expect(body.tags).toEqual([]);
+    });
+
+    test('should reject task with too many tags', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: JSON.stringify({
+          description: 'Test task',
+          tags: ['tag1', 'tag2', 'tag3', 'tag4', 'tag5', 'tag6']
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toContain('Maximum 5 tags allowed');
+    });
+
+    test('should reject task with invalid tag format', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: JSON.stringify({
+          description: 'Test task',
+          tags: ['Invalid Tag']
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toContain('Tag must contain only lowercase letters, numbers, and hyphens');
+    });
+
+    test('should reject task with tag exceeding max length', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: JSON.stringify({
+          description: 'Test task',
+          tags: ['a'.repeat(31)]
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toContain('Tag must not exceed 30 characters');
+    });
+
+    test('should reject task with non-array tags', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: JSON.stringify({
+          description: 'Test task',
+          tags: 'bug'
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toContain('Tags must be an array');
+    });
+
+    test('should persist task with tags to DynamoDB', async () => {
+      putTask.mockResolvedValue({});
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: JSON.stringify({
+          description: 'Test task with tags',
+          tags: ['bug', 'frontend']
+        })
+      };
+
+      await handler(event);
+
+      expect(putTask).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: 'Test task with tags',
+          tags: ['bug', 'frontend']
+        })
+      );
+    });
+  });
 });

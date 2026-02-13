@@ -40,6 +40,7 @@ exports.handler = async (event) => {
       priority: requestBody.priority || 'P2',
       status: requestBody.status || 'open',
       dueDate: requestBody.dueDate || null,
+      tags: requestBody.tags || [],
       createdAt: now,
       updatedAt: now
     };
