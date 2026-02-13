@@ -67,7 +67,7 @@ describe('DynamoDB Module', () => {
         updatedAt: '2024-01-01T00:00:00.000Z'
       };
 
-      await expect(putTask(task)).rejects.toThrow('Service temporarily unavailable');
+      await expect(putTask(task)).rejects.toThrow('Internal server error: putting task');
     });
   });
 
@@ -97,7 +97,7 @@ describe('DynamoDB Module', () => {
     test('should handle DynamoDB errors', async () => {
       mockSend.mockRejectedValue(new Error('DynamoDB error'));
 
-      await expect(getTask('123')).rejects.toThrow('Service temporarily unavailable');
+      await expect(getTask('123')).rejects.toThrow('Internal server error: getting task');
     });
   });
 
@@ -113,7 +113,7 @@ describe('DynamoDB Module', () => {
     test('should handle DynamoDB errors', async () => {
       mockSend.mockRejectedValue(new Error('DynamoDB error'));
 
-      await expect(deleteTask('123')).rejects.toThrow('Service temporarily unavailable');
+      await expect(deleteTask('123')).rejects.toThrow('Internal server error: deleting task');
     });
   });
 
@@ -155,7 +155,7 @@ describe('DynamoDB Module', () => {
     test('should handle DynamoDB errors', async () => {
       mockSend.mockRejectedValue(new Error('DynamoDB error'));
 
-      await expect(scanTasks()).rejects.toThrow('Service temporarily unavailable');
+      await expect(scanTasks()).rejects.toThrow('Internal server error: scanning tasks');
     });
   });
 
@@ -182,7 +182,7 @@ describe('DynamoDB Module', () => {
     test('should handle DynamoDB errors', async () => {
       mockSend.mockRejectedValue(new Error('DynamoDB error'));
 
-      await expect(queryTasksByAssignee('user@example.com')).rejects.toThrow('Service temporarily unavailable');
+      await expect(queryTasksByAssignee('user@example.com')).rejects.toThrow('Internal server error: querying tasks by assignee');
     });
   });
 
@@ -209,7 +209,7 @@ describe('DynamoDB Module', () => {
     test('should handle DynamoDB errors', async () => {
       mockSend.mockRejectedValue(new Error('DynamoDB error'));
 
-      await expect(queryTasksByStatus('open')).rejects.toThrow('Service temporarily unavailable');
+      await expect(queryTasksByStatus('open')).rejects.toThrow('Internal server error: querying tasks by status');
     });
   });
 
@@ -236,7 +236,7 @@ describe('DynamoDB Module', () => {
     test('should handle DynamoDB errors', async () => {
       mockSend.mockRejectedValue(new Error('DynamoDB error'));
 
-      await expect(queryTasksByPriority('P1')).rejects.toThrow('Service temporarily unavailable');
+      await expect(queryTasksByPriority('P1')).rejects.toThrow('Internal server error: querying tasks by priority');
     });
   });
 

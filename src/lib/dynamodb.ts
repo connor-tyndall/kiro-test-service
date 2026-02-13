@@ -28,7 +28,7 @@ export async function putTask(task: Task): Promise<Task> {
     return task;
   } catch (err) {
     console.error('DynamoDB putTask error:', err);
-    throw new Error('Service temporarily unavailable');
+    throw new Error('Internal server error: putting task');
   }
 }
 
@@ -50,7 +50,7 @@ export async function getTask(id: string): Promise<TaskItem | null> {
     return (result.Item as TaskItem) || null;
   } catch (err) {
     console.error('DynamoDB getTask error:', err);
-    throw new Error('Service temporarily unavailable');
+    throw new Error('Internal server error: getting task');
   }
 }
 
@@ -70,7 +70,7 @@ export async function deleteTask(id: string): Promise<void> {
     }));
   } catch (err) {
     console.error('DynamoDB deleteTask error:', err);
-    throw new Error('Service temporarily unavailable');
+    throw new Error('Internal server error: deleting task');
   }
 }
 
@@ -114,7 +114,7 @@ export async function scanTasks(limit?: number, nextToken?: string): Promise<Que
     };
   } catch (err) {
     console.error('DynamoDB scanTasks error:', err);
-    throw new Error('Service temporarily unavailable');
+    throw new Error('Internal server error: scanning tasks');
   }
 }
 
@@ -161,7 +161,7 @@ export async function queryTasksByAssignee(assignee: string, limit?: number, nex
     };
   } catch (err) {
     console.error('DynamoDB queryTasksByAssignee error:', err);
-    throw new Error('Service temporarily unavailable');
+    throw new Error('Internal server error: querying tasks by assignee');
   }
 }
 
@@ -212,7 +212,7 @@ export async function queryTasksByStatus(status: string, limit?: number, nextTok
     };
   } catch (err) {
     console.error('DynamoDB queryTasksByStatus error:', err);
-    throw new Error('Service temporarily unavailable');
+    throw new Error('Internal server error: querying tasks by status');
   }
 }
 
@@ -259,6 +259,6 @@ export async function queryTasksByPriority(priority: string, limit?: number, nex
     };
   } catch (err) {
     console.error('DynamoDB queryTasksByPriority error:', err);
-    throw new Error('Service temporarily unavailable');
+    throw new Error('Internal server error: querying tasks by priority');
   }
 }
