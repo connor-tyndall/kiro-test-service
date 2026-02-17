@@ -1,5 +1,5 @@
 const VALID_PRIORITIES = ['P0', 'P1', 'P2', 'P3', 'P4'];
-const VALID_STATUSES = ['open', 'in-progress', 'blocked', 'done'];
+const VALID_STATUSES = ['open', 'in-progress', 'blocked', 'done', 'archived'];
 const MAX_DESCRIPTION_LENGTH = 1000;
 const MAX_ASSIGNEE_LENGTH = 255;
 

@@ -23,7 +23,7 @@ exports.handler = async (event) => {
   try {
     // Extract query parameters
     const queryParams = event.queryStringParameters || {};
-    const { assignee, priority, status, dueDateBefore, limit, nextToken } = queryParams;
+    const { assignee, priority, status, dueDateBefore, limit, nextToken, includeArchived } = queryParams;
 
     // Validate filter parameters
     if (priority && validatePriority(priority)) {
@@ -52,6 +52,9 @@ exports.handler = async (event) => {
         return error(400, nextTokenError);
       }
     }
+
+    // Parse includeArchived parameter (defaults to false)
+    const shouldIncludeArchived = includeArchived === 'true';
 
     let result;
 
@@ -104,6 +107,11 @@ exports.handler = async (event) => {
         const taskDate = new Date(task.dueDate);
         return taskDate <= filterDate;
       });
+    }
+
+    // Exclude archived tasks by default unless includeArchived=true
+    if (!shouldIncludeArchived) {
+      result.items = result.items.filter(task => task.status !== 'archived');
     }
 
     // Format tasks

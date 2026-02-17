@@ -1,5 +1,5 @@
 const { handler } = require('../../../src/handlers/deleteTask');
-const { getTask, deleteTask } = require('../../../src/lib/dynamodb');
+const { getTask, putTask } = require('../../../src/lib/dynamodb');
 
 jest.mock('../../../src/lib/dynamodb');
 
@@ -16,14 +16,16 @@ describe('deleteTask handler', () => {
     process.env = originalEnv;
   });
 
-  test('should delete existing task', async () => {
+  test('should archive existing task', async () => {
     const mockTask = {
       id: '123',
-      description: 'Test task'
+      description: 'Test task',
+      status: 'open',
+      createdAt: '2024-01-01T00:00:00.000Z'
     };
 
     getTask.mockResolvedValue(mockTask);
-    deleteTask.mockResolvedValue();
+    putTask.mockResolvedValue();
 
     const event = {
       headers: {
@@ -36,7 +38,10 @@ describe('deleteTask handler', () => {
 
     expect(response.statusCode).toBe(204);
     expect(response.body).toBe('');
-    expect(deleteTask).toHaveBeenCalledWith('123');
+    expect(putTask).toHaveBeenCalledWith(expect.objectContaining({
+      id: '123',
+      status: 'archived'
+    }));
   });
 
   test('should return 404 for non-existent task', async () => {
@@ -54,7 +59,7 @@ describe('deleteTask handler', () => {
 
     expect(response.statusCode).toBe(404);
     expect(body.error).toBe('Task not found');
-    expect(deleteTask).not.toHaveBeenCalled();
+    expect(putTask).not.toHaveBeenCalled();
   });
 
   test('should return 400 for missing task ID', async () => {
@@ -73,8 +78,8 @@ describe('deleteTask handler', () => {
   });
 
   test('should handle DynamoDB errors', async () => {
-    getTask.mockResolvedValue({ id: '123' });
-    deleteTask.mockRejectedValue(new Error('DynamoDB error'));
+    getTask.mockResolvedValue({ id: '123', status: 'open' });
+    putTask.mockRejectedValue(new Error('DynamoDB error'));
 
     const event = {
       headers: {
@@ -87,7 +92,7 @@ describe('deleteTask handler', () => {
     const body = JSON.parse(response.body);
 
     expect(response.statusCode).toBe(500);
-    expect(body.error).toBe('Internal server error: deleting task');
+    expect(body.error).toBe('Internal server error: archiving task');
   });
 
   test('should return 401 for missing API key', async () => {
@@ -116,6 +121,31 @@ describe('deleteTask handler', () => {
 
     expect(response.statusCode).toBe(401);
     expect(body.error).toBe('Invalid API key');
+  });
+
+  test('should return 409 when archiving already-archived task', async () => {
+    const mockTask = {
+      id: '123',
+      description: 'Test task',
+      status: 'archived',
+      createdAt: '2024-01-01T00:00:00.000Z'
+    };
+
+    getTask.mockResolvedValue(mockTask);
+
+    const event = {
+      headers: {
+        'x-api-key': 'test-api-key'
+      },
+      pathParameters: { id: '123' }
+    };
+
+    const response = await handler(event);
+    const body = JSON.parse(response.body);
+
+    expect(response.statusCode).toBe(409);
+    expect(body.error).toBe('Task is already archived');
+    expect(putTask).not.toHaveBeenCalled();
   });
 
   describe('Edge Cases', () => {
@@ -162,7 +192,68 @@ describe('deleteTask handler', () => {
       const body = JSON.parse(response.body);
 
       expect(response.statusCode).toBe(500);
-      expect(body.error).toBe('Internal server error: deleting task');
+      expect(body.error).toBe('Internal server error: archiving task');
+    });
+
+    test('should update updatedAt timestamp when archiving', async () => {
+      const mockTask = {
+        id: '123',
+        description: 'Test task',
+        status: 'open',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z'
+      };
+
+      getTask.mockResolvedValue(mockTask);
+      putTask.mockResolvedValue();
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        pathParameters: { id: '123' }
+      };
+
+      await handler(event);
+
+      expect(putTask).toHaveBeenCalledWith(expect.objectContaining({
+        updatedAt: expect.any(String)
+      }));
+      
+      const savedTask = putTask.mock.calls[0][0];
+      expect(savedTask.updatedAt).not.toBe('2024-01-01T00:00:00.000Z');
+    });
+
+    test('should archive task from any non-archived status', async () => {
+      const statuses = ['open', 'in-progress', 'blocked', 'done'];
+      
+      for (const status of statuses) {
+        jest.clearAllMocks();
+        
+        const mockTask = {
+          id: '123',
+          description: 'Test task',
+          status: status,
+          createdAt: '2024-01-01T00:00:00.000Z'
+        };
+
+        getTask.mockResolvedValue(mockTask);
+        putTask.mockResolvedValue();
+
+        const event = {
+          headers: {
+            'x-api-key': 'test-api-key'
+          },
+          pathParameters: { id: '123' }
+        };
+
+        const response = await handler(event);
+
+        expect(response.statusCode).toBe(204);
+        expect(putTask).toHaveBeenCalledWith(expect.objectContaining({
+          status: 'archived'
+        }));
+      }
     });
   });
 });

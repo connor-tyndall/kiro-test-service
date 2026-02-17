@@ -541,4 +541,63 @@ describe('listTasks handler', () => {
       expect(body.error).toBe('Invalid nextToken parameter');
     });
   });
+
+  describe('Archive Filtering', () => {
+    const archivedTask = {
+      id: '3',
+      description: 'Archived Task',
+      status: 'archived',
+      priority: 'P1',
+      createdAt: '2024-01-03T00:00:00.000Z',
+      updatedAt: '2024-01-03T00:00:00.000Z'
+    };
+
+    test('should exclude archived tasks by default', async () => {
+      scanTasks.mockResolvedValue({ items: [...mockTasks, archivedTask], nextToken: null });
+
+      const event = {
+        headers: { 'x-api-key': 'test-api-key' },
+        queryStringParameters: null
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.tasks).toHaveLength(2);
+      expect(body.tasks.every(t => t.status !== 'archived')).toBe(true);
+    });
+
+    test('should include archived tasks when includeArchived=true', async () => {
+      scanTasks.mockResolvedValue({ items: [...mockTasks, archivedTask], nextToken: null });
+
+      const event = {
+        headers: { 'x-api-key': 'test-api-key' },
+        queryStringParameters: { includeArchived: 'true' }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.tasks).toHaveLength(3);
+      expect(body.tasks.some(t => t.status === 'archived')).toBe(true);
+    });
+
+    test('should exclude archived tasks when includeArchived=false', async () => {
+      scanTasks.mockResolvedValue({ items: [...mockTasks, archivedTask], nextToken: null });
+
+      const event = {
+        headers: { 'x-api-key': 'test-api-key' },
+        queryStringParameters: { includeArchived: 'false' }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.tasks).toHaveLength(2);
+      expect(body.tasks.every(t => t.status !== 'archived')).toBe(true);
+    });
+  });
 });
