@@ -10,8 +10,10 @@ const { validateApiKey } = require('../lib/auth');
  * @returns {Promise<Object>} API Gateway response
  */
 exports.handler = async (event) => {
+  const requestId = event.requestContext?.requestId || 'UNKNOWN';
+
   // Validate API key
-  const authError = validateApiKey(event);
+  const authError = validateApiKey(event, requestId);
   if (authError) {
     return authError;
   }
@@ -22,13 +24,13 @@ exports.handler = async (event) => {
     try {
       requestBody = JSON.parse(event.body || '{}');
     } catch (parseError) {
-      return error(400, 'Invalid JSON in request body');
+      return error(400, 'Invalid JSON in request body', requestId);
     }
 
     // Validate input
     const validation = validateTaskInput(requestBody);
     if (!validation.valid) {
-      return error(400, validation.errors.join(', '));
+      return error(400, validation.errors.join(', '), requestId);
     }
 
     // Generate unique ID and timestamps
@@ -48,9 +50,9 @@ exports.handler = async (event) => {
     await putTask(task);
 
     // Return created task
-    return success(201, task);
+    return success(201, task, requestId);
   } catch (err) {
-    console.error('Error creating task:', err);
-    return error(500, 'Internal server error: creating task');
+    console.error(`[${requestId}] Error creating task:`, err);
+    return error(500, 'Internal server error: creating task', requestId);
   }
 };

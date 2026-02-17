@@ -8,8 +8,10 @@ const { validateApiKey } = require('../lib/auth');
  * @returns {Promise<Object>} API Gateway response
  */
 exports.handler = async (event) => {
+  const requestId = event.requestContext?.requestId || 'UNKNOWN';
+
   // Validate API key
-  const authError = validateApiKey(event);
+  const authError = validateApiKey(event, requestId);
   if (authError) {
     return authError;
   }
@@ -19,13 +21,13 @@ exports.handler = async (event) => {
     const taskId = event.pathParameters?.id;
     
     if (!taskId) {
-      return error(400, 'Task ID is required');
+      return error(400, 'Task ID is required', requestId);
     }
 
     // Check if task exists
     const existingTask = await getTask(taskId);
     if (!existingTask) {
-      return error(404, 'Task not found');
+      return error(404, 'Task not found', requestId);
     }
 
     // Delete task from DynamoDB
@@ -35,12 +37,13 @@ exports.handler = async (event) => {
     return {
       statusCode: 204,
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'x-request-id': requestId
       },
       body: ''
     };
   } catch (err) {
-    console.error('Error deleting task:', err);
-    return error(500, 'Internal server error: deleting task');
+    console.error(`[${requestId}] Error deleting task:`, err);
+    return error(500, 'Internal server error: deleting task', requestId);
   }
 };

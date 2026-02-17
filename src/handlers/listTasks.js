@@ -14,8 +14,10 @@ const { validateApiKey } = require('../lib/auth');
  * @returns {Promise<Object>} API Gateway response
  */
 exports.handler = async (event) => {
+  const requestId = event.requestContext?.requestId || 'UNKNOWN';
+
   // Validate API key
-  const authError = validateApiKey(event);
+  const authError = validateApiKey(event, requestId);
   if (authError) {
     return authError;
   }
@@ -27,13 +29,13 @@ exports.handler = async (event) => {
 
     // Validate filter parameters
     if (priority && validatePriority(priority)) {
-      return error(400, validatePriority(priority));
+      return error(400, validatePriority(priority), requestId);
     }
     if (status && validateStatus(status)) {
-      return error(400, validateStatus(status));
+      return error(400, validateStatus(status), requestId);
     }
     if (dueDateBefore && validateDateFormat(dueDateBefore)) {
-      return error(400, validateDateFormat(dueDateBefore));
+      return error(400, validateDateFormat(dueDateBefore), requestId);
     }
 
     // Validate and parse limit
@@ -41,15 +43,15 @@ exports.handler = async (event) => {
     if (limit) {
       const limitError = validateLimit(limit);
       if (limitError) {
-        return error(400, limitError);
+        return error(400, limitError, requestId);
       }
     }
 
     // Validate nextToken parameter
-    if (nextToken) {
+    if (nextToken !== undefined) {
       const nextTokenError = validateNextToken(nextToken);
       if (nextTokenError) {
-        return error(400, nextTokenError);
+        return error(400, nextTokenError, requestId);
       }
     }
 
@@ -115,9 +117,9 @@ exports.handler = async (event) => {
       responseBody.nextToken = result.nextToken;
     }
 
-    return success(200, responseBody);
+    return success(200, responseBody, requestId);
   } catch (err) {
-    console.error('Error listing tasks:', err);
-    return error(500, 'Internal server error: listing tasks');
+    console.error(`[${requestId}] Error listing tasks:`, err);
+    return error(500, 'Internal server error: listing tasks', requestId);
   }
 };

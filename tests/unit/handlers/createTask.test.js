@@ -23,6 +23,9 @@ describe('createTask handler', () => {
       headers: {
         'x-api-key': 'test-api-key'
       },
+      requestContext: {
+        requestId: 'test-request-id-123'
+      },
       body: JSON.stringify({
         description: 'Test task',
         assignee: 'user@example.com',
@@ -167,6 +170,115 @@ describe('createTask handler', () => {
     expect(body.error).toBe('Invalid API key');
   });
 
+  describe('Request ID Tracking', () => {
+    test('should include x-request-id header in success response', async () => {
+      putTask.mockResolvedValue({});
+      const requestId = 'test-request-id-success';
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        requestContext: {
+          requestId: requestId
+        },
+        body: JSON.stringify({
+          description: 'Test task'
+        })
+      };
+
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(201);
+      expect(response.headers['x-request-id']).toBe(requestId);
+    });
+
+    test('should include x-request-id header in error response', async () => {
+      const requestId = 'test-request-id-error';
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        requestContext: {
+          requestId: requestId
+        },
+        body: JSON.stringify({
+          priority: 'P1'
+        })
+      };
+
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(400);
+      expect(response.headers['x-request-id']).toBe(requestId);
+    });
+
+    test('should include requestId in error response body', async () => {
+      const requestId = 'test-request-id-body';
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        requestContext: {
+          requestId: requestId
+        },
+        body: JSON.stringify({
+          priority: 'P1'
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.requestId).toBe(requestId);
+    });
+
+    test('should use UNKNOWN when requestContext is missing', async () => {
+      putTask.mockResolvedValue({});
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: JSON.stringify({
+          description: 'Test task'
+        })
+      };
+
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(201);
+      expect(response.headers['x-request-id']).toBe('UNKNOWN');
+    });
+
+    test('should include x-request-id in 500 error response', async () => {
+      putTask.mockRejectedValue(new Error('DynamoDB error'));
+      const requestId = 'test-request-id-500';
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        requestContext: {
+          requestId: requestId
+        },
+        body: JSON.stringify({
+          description: 'Test task'
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(500);
+      expect(response.headers['x-request-id']).toBe(requestId);
+      expect(body.requestId).toBe(requestId);
+    });
+  });
+
   describe('Edge Cases', () => {
     test('should handle null body', async () => {
       const event = {
@@ -197,7 +309,7 @@ describe('createTask handler', () => {
       const body = JSON.parse(response.body);
 
       expect(response.statusCode).toBe(400);
-      expect(body.error).toContain('Description is required');
+      expect(body.error).toContain('Description cannot be empty or whitespace only');
     });
 
     test('should handle whitespace-only description', async () => {
@@ -214,7 +326,7 @@ describe('createTask handler', () => {
       const body = JSON.parse(response.body);
 
       expect(response.statusCode).toBe(400);
-      expect(body.error).toContain('Description is required');
+      expect(body.error).toContain('Description cannot be empty or whitespace only');
     });
   });
 });

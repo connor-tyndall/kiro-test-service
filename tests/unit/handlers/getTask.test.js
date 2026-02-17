@@ -122,6 +122,101 @@ describe('getTask handler', () => {
     expect(body.error).toBe('Invalid API key');
   });
 
+  describe('Request ID Tracking', () => {
+    test('should include x-request-id header in success response', async () => {
+      const mockTask = {
+        id: '123',
+        description: 'Test task',
+        priority: 'P1',
+        status: 'open',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z'
+      };
+      getTask.mockResolvedValue(mockTask);
+      const requestId = 'test-request-id-success';
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        requestContext: {
+          requestId: requestId
+        },
+        pathParameters: { id: '123' }
+      };
+
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['x-request-id']).toBe(requestId);
+    });
+
+    test('should include x-request-id header in error response', async () => {
+      getTask.mockResolvedValue(null);
+      const requestId = 'test-request-id-error';
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        requestContext: {
+          requestId: requestId
+        },
+        pathParameters: { id: 'nonexistent' }
+      };
+
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(404);
+      expect(response.headers['x-request-id']).toBe(requestId);
+    });
+
+    test('should include requestId in error response body', async () => {
+      getTask.mockResolvedValue(null);
+      const requestId = 'test-request-id-body';
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        requestContext: {
+          requestId: requestId
+        },
+        pathParameters: { id: 'nonexistent' }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(404);
+      expect(body.requestId).toBe(requestId);
+    });
+
+    test('should use UNKNOWN when requestContext is missing', async () => {
+      const mockTask = {
+        id: '123',
+        description: 'Test task',
+        priority: 'P1',
+        status: 'open',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z'
+      };
+      getTask.mockResolvedValue(mockTask);
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        pathParameters: { id: '123' }
+      };
+
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['x-request-id']).toBe('UNKNOWN');
+    });
+  });
+
   describe('Edge Cases', () => {
     test('should handle null pathParameters', async () => {
       const event = {

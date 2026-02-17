@@ -9,8 +9,10 @@ const { validateApiKey } = require('../lib/auth');
  * @returns {Promise<Object>} API Gateway response
  */
 exports.handler = async (event) => {
+  const requestId = event.requestContext?.requestId || 'UNKNOWN';
+
   // Validate API key
-  const authError = validateApiKey(event);
+  const authError = validateApiKey(event, requestId);
   if (authError) {
     return authError;
   }
@@ -20,7 +22,7 @@ exports.handler = async (event) => {
     const taskId = event.pathParameters?.id;
     
     if (!taskId) {
-      return error(400, 'Task ID is required');
+      return error(400, 'Task ID is required', requestId);
     }
 
     // Parse request body
@@ -28,13 +30,13 @@ exports.handler = async (event) => {
     try {
       requestBody = JSON.parse(event.body || '{}');
     } catch (parseError) {
-      return error(400, 'Invalid JSON in request body');
+      return error(400, 'Invalid JSON in request body', requestId);
     }
 
     // Check if task exists
     const existingTask = await getTask(taskId);
     if (!existingTask) {
-      return error(404, 'Task not found');
+      return error(404, 'Task not found', requestId);
     }
 
     // Validate update data (description not required for updates)
@@ -45,7 +47,7 @@ exports.handler = async (event) => {
     
     const validation = validateTaskInput(dataToValidate);
     if (!validation.valid) {
-      return error(400, validation.errors.join(', '));
+      return error(400, validation.errors.join(', '), requestId);
     }
 
     // Build updated task (preserve immutable fields)
@@ -78,9 +80,9 @@ exports.handler = async (event) => {
 
     // Return updated task
     const formattedTask = formatTask(updatedTask);
-    return success(200, formattedTask);
+    return success(200, formattedTask, requestId);
   } catch (err) {
-    console.error('Error updating task:', err);
-    return error(500, 'Internal server error: updating task');
+    console.error(`[${requestId}] Error updating task:`, err);
+    return error(500, 'Internal server error: updating task', requestId);
   }
 };

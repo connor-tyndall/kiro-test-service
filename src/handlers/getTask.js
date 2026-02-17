@@ -9,8 +9,10 @@ const { validateApiKey } = require('../lib/auth');
  * @returns {Promise<Object>} API Gateway response
  */
 exports.handler = async (event) => {
+  const requestId = event.requestContext?.requestId || 'UNKNOWN';
+
   // Validate API key
-  const authError = validateApiKey(event);
+  const authError = validateApiKey(event, requestId);
   if (authError) {
     return authError;
   }
@@ -20,21 +22,21 @@ exports.handler = async (event) => {
     const taskId = event.pathParameters?.id;
     
     if (!taskId) {
-      return error(400, 'Task ID is required');
+      return error(400, 'Task ID is required', requestId);
     }
 
     // Retrieve task from DynamoDB
     const task = await getTask(taskId);
 
     if (!task) {
-      return error(404, 'Task not found');
+      return error(404, 'Task not found', requestId);
     }
 
     // Format and return task
     const formattedTask = formatTask(task);
-    return success(200, formattedTask);
+    return success(200, formattedTask, requestId);
   } catch (err) {
-    console.error('Error retrieving task:', err);
-    return error(500, 'Internal server error: retrieving task');
+    console.error(`[${requestId}] Error retrieving task:`, err);
+    return error(500, 'Internal server error: retrieving task', requestId);
   }
 };

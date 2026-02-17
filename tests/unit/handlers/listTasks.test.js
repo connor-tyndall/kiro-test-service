@@ -290,7 +290,8 @@ describe('listTasks handler', () => {
     });
 
     test('should pass nextToken to DynamoDB', async () => {
-      const token = 'test-token';
+      const validKey = { PK: 'TASK#test', SK: 'TASK#test' };
+      const token = Buffer.from(JSON.stringify(validKey)).toString('base64');
       scanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
 
       const event = {
@@ -392,7 +393,9 @@ describe('listTasks handler', () => {
     });
 
     test('should work with pagination and filters', async () => {
-      const nextToken = 'next-page-token';
+      const nextToken = 'next-page-token-base64';
+      const validKey = { PK: 'TASK#prev', SK: 'TASK#prev' };
+      const prevToken = Buffer.from(JSON.stringify(validKey)).toString('base64');
       queryTasksByAssignee.mockResolvedValue({ items: [mockTasks[0]], nextToken });
 
       const event = {
@@ -402,7 +405,7 @@ describe('listTasks handler', () => {
         queryStringParameters: {
           assignee: 'user1@example.com',
           limit: '10',
-          nextToken: 'prev-token'
+          nextToken: prevToken
         }
       };
 
@@ -412,7 +415,7 @@ describe('listTasks handler', () => {
       expect(response.statusCode).toBe(200);
       expect(body.tasks).toHaveLength(1);
       expect(body.nextToken).toBe(nextToken);
-      expect(queryTasksByAssignee).toHaveBeenCalledWith('user1@example.com', 10, 'prev-token');
+      expect(queryTasksByAssignee).toHaveBeenCalledWith('user1@example.com', 10, prevToken);
     });
   });
 
@@ -539,6 +542,109 @@ describe('listTasks handler', () => {
 
       expect(response.statusCode).toBe(400);
       expect(body.error).toBe('Invalid nextToken parameter');
+    });
+  });
+
+  describe('Request ID Tracking', () => {
+    test('should include x-request-id header in success response', async () => {
+      scanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
+      const requestId = 'test-request-id-success';
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        requestContext: {
+          requestId: requestId
+        },
+        queryStringParameters: null
+      };
+
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['x-request-id']).toBe(requestId);
+    });
+
+    test('should include x-request-id header in error response', async () => {
+      const requestId = 'test-request-id-error';
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        requestContext: {
+          requestId: requestId
+        },
+        queryStringParameters: {
+          priority: 'invalid'
+        }
+      };
+
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(400);
+      expect(response.headers['x-request-id']).toBe(requestId);
+    });
+
+    test('should include requestId in error response body', async () => {
+      const requestId = 'test-request-id-body';
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        requestContext: {
+          requestId: requestId
+        },
+        queryStringParameters: {
+          status: 'invalid'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.requestId).toBe(requestId);
+    });
+
+    test('should use UNKNOWN when requestContext is missing', async () => {
+      scanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: null
+      };
+
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['x-request-id']).toBe('UNKNOWN');
+    });
+
+    test('should include x-request-id in 500 error response', async () => {
+      scanTasks.mockRejectedValue(new Error('DynamoDB error'));
+      const requestId = 'test-request-id-500';
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        requestContext: {
+          requestId: requestId
+        },
+        queryStringParameters: null
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(500);
+      expect(response.headers['x-request-id']).toBe(requestId);
+      expect(body.requestId).toBe(requestId);
     });
   });
 });

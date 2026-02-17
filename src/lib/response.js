@@ -2,14 +2,19 @@
  * Creates a success response
  * @param {number} statusCode - HTTP status code
  * @param {Object} body - Response body
+ * @param {string} [requestId] - Optional request ID for x-request-id header
  * @returns {Object} Lambda response object
  */
-function success(statusCode, body) {
+function success(statusCode, body, requestId) {
+  const headers = {
+    'Content-Type': 'application/json'
+  };
+  if (requestId) {
+    headers['x-request-id'] = requestId;
+  }
   return {
     statusCode,
-    headers: {
-      'Content-Type': 'application/json'
-    },
+    headers,
     body: JSON.stringify(body)
   };
 }
@@ -18,17 +23,26 @@ function success(statusCode, body) {
  * Creates an error response
  * @param {number} statusCode - HTTP status code
  * @param {string} message - Error message
+ * @param {string} [requestId] - Optional request ID for x-request-id header and response body
  * @returns {Object} Lambda response object
  */
-function error(statusCode, message) {
+function error(statusCode, message, requestId) {
+  const headers = {
+    'Content-Type': 'application/json'
+  };
+  if (requestId) {
+    headers['x-request-id'] = requestId;
+  }
+  const responseBody = {
+    error: message
+  };
+  if (requestId) {
+    responseBody.requestId = requestId;
+  }
   return {
     statusCode,
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      error: message
-    })
+    headers,
+    body: JSON.stringify(responseBody)
   };
 }
 

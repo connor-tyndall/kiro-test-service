@@ -105,6 +105,76 @@ describe('Auth Module', () => {
     });
   });
 
+  describe('Request ID Tracking', () => {
+    test('should include x-request-id header in 401 error response when requestId is provided', () => {
+      const requestId = 'test-request-id-401';
+      const event = {
+        headers: {}
+      };
+      const result = validateApiKey(event, requestId);
+      expect(result.statusCode).toBe(401);
+      expect(result.headers['x-request-id']).toBe(requestId);
+    });
+
+    test('should include requestId in 401 error response body when requestId is provided', () => {
+      const requestId = 'test-request-id-body';
+      const event = {
+        headers: {
+          'x-api-key': 'wrong-key'
+        }
+      };
+      const result = validateApiKey(event, requestId);
+      const body = JSON.parse(result.body);
+      expect(result.statusCode).toBe(401);
+      expect(body.requestId).toBe(requestId);
+    });
+
+    test('should include x-request-id header in 500 error response when requestId is provided', () => {
+      delete process.env.API_KEY;
+      const requestId = 'test-request-id-500';
+      const event = {
+        headers: {
+          'x-api-key': 'some-key'
+        }
+      };
+      const result = validateApiKey(event, requestId);
+      expect(result.statusCode).toBe(500);
+      expect(result.headers['x-request-id']).toBe(requestId);
+    });
+
+    test('should include requestId in 500 error response body when requestId is provided', () => {
+      delete process.env.API_KEY;
+      const requestId = 'test-request-id-500-body';
+      const event = {
+        headers: {
+          'x-api-key': 'some-key'
+        }
+      };
+      const result = validateApiKey(event, requestId);
+      const body = JSON.parse(result.body);
+      expect(result.statusCode).toBe(500);
+      expect(body.requestId).toBe(requestId);
+    });
+
+    test('should not include x-request-id header when requestId is not provided', () => {
+      const event = {
+        headers: {}
+      };
+      const result = validateApiKey(event);
+      expect(result.statusCode).toBe(401);
+      expect(result.headers['x-request-id']).toBeUndefined();
+    });
+
+    test('should not include requestId in response body when requestId is not provided', () => {
+      const event = {
+        headers: {}
+      };
+      const result = validateApiKey(event);
+      const body = JSON.parse(result.body);
+      expect(body.requestId).toBeUndefined();
+    });
+  });
+
   describe('Edge Cases', () => {
     test('should handle undefined event', () => {
       const result = validateApiKey(undefined);
@@ -126,6 +196,22 @@ describe('Auth Module', () => {
       };
       const result = validateApiKey(event);
       expect(result.statusCode).toBe(401);
+    });
+
+    test('should handle undefined event with requestId', () => {
+      const requestId = 'test-request-id-undefined';
+      const result = validateApiKey(undefined, requestId);
+      expect(result.statusCode).toBe(401);
+      expect(result.headers['x-request-id']).toBe(requestId);
+      expect(JSON.parse(result.body).requestId).toBe(requestId);
+    });
+
+    test('should handle null event with requestId', () => {
+      const requestId = 'test-request-id-null';
+      const result = validateApiKey(null, requestId);
+      expect(result.statusCode).toBe(401);
+      expect(result.headers['x-request-id']).toBe(requestId);
+      expect(JSON.parse(result.body).requestId).toBe(requestId);
     });
   });
 });
