@@ -181,6 +181,27 @@ describe('updateTask handler', () => {
   });
 
   describe('Edge Cases', () => {
+    test('should reject archived status update to prevent bypass of delete/archive handler', async () => {
+      getTask.mockResolvedValue(mockExistingTask);
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        pathParameters: { id: '123' },
+        body: JSON.stringify({
+          status: 'archived'
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toContain('Status must be one of');
+      expect(body.error).not.toContain('archived');
+    });
+
     test('should handle DynamoDB errors', async () => {
       getTask.mockResolvedValue(mockExistingTask);
       putTask.mockRejectedValue(new Error('DynamoDB error'));

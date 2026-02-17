@@ -2,13 +2,15 @@ const {
   validateTaskInput,
   validatePriority,
   validateStatus,
+  validateStatusForRead,
   validateDateFormat,
   validateDescription,
   validateAssignee,
   validateLimit,
   validateNextToken,
   VALID_PRIORITIES,
-  VALID_STATUSES
+  VALID_STATUSES,
+  VALID_STATUSES_WITH_ARCHIVED
 } = require('../../src/lib/validation');
 
 describe('Validation Module', () => {
@@ -81,11 +83,17 @@ describe('Validation Module', () => {
   });
 
   describe('validateStatus', () => {
-    test('should accept all valid statuses', () => {
+    test('should accept all valid statuses for write operations', () => {
       VALID_STATUSES.forEach(status => {
         const error = validateStatus(status);
         expect(error).toBeNull();
       });
+    });
+
+    test('should reject archived status for write operations', () => {
+      const error = validateStatus('archived');
+      expect(error).toContain('Status must be one of');
+      expect(error).not.toContain('archived');
     });
 
     test('should reject invalid status', () => {
@@ -100,6 +108,35 @@ describe('Validation Module', () => {
 
     test('should reject numeric status', () => {
       const error = validateStatus(1);
+      expect(error).toContain('Status must be one of');
+    });
+  });
+
+  describe('validateStatusForRead', () => {
+    test('should accept all valid statuses including archived for read operations', () => {
+      VALID_STATUSES_WITH_ARCHIVED.forEach(status => {
+        const error = validateStatusForRead(status);
+        expect(error).toBeNull();
+      });
+    });
+
+    test('should accept archived status for read operations', () => {
+      const error = validateStatusForRead('archived');
+      expect(error).toBeNull();
+    });
+
+    test('should reject invalid status for read operations', () => {
+      const error = validateStatusForRead('completed');
+      expect(error).toContain('Status must be one of');
+    });
+
+    test('should reject uppercase status for read operations', () => {
+      const error = validateStatusForRead('OPEN');
+      expect(error).toContain('Status must be one of');
+    });
+
+    test('should reject numeric status for read operations', () => {
+      const error = validateStatusForRead(1);
       expect(error).toContain('Status must be one of');
     });
   });

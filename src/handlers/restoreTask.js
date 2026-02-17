@@ -3,7 +3,7 @@ const { getTask, putTask } = require('../lib/dynamodb');
 const { validateApiKey } = require('../lib/auth');
 
 /**
- * Lambda handler for archiving a task (soft delete)
+ * Lambda handler for restoring an archived task
  * @param {Object} event - API Gateway event
  * @returns {Promise<Object>} API Gateway response
  */
@@ -28,24 +28,25 @@ exports.handler = async (event) => {
       return error(404, 'Task not found');
     }
 
-    // Check if task is already archived
-    if (existingTask.status === 'archived') {
-      return error(409, 'Task is already archived');
+    // Check if task is archived
+    if (existingTask.status !== 'archived') {
+      return error(409, 'Task is not archived');
     }
 
-    // Archive task by setting status to 'archived'
-    const archivedTask = {
+    // Restore task by setting status back to 'open'
+    const restoredTask = {
       ...existingTask,
-      status: 'archived',
+      status: 'open',
       updatedAt: new Date().toISOString()
     };
 
-    await putTask(archivedTask);
+    await putTask(restoredTask);
 
-    // Return the archived task
-    return success(200, formatTask(archivedTask));
+    // Return the restored task
+    const formattedTask = formatTask(restoredTask);
+    return success(200, formattedTask);
   } catch (err) {
-    console.error('Error archiving task:', err);
-    return error(500, 'Internal server error: archiving task');
+    console.error('Error restoring task:', err);
+    return error(500, 'Internal server error: restoring task');
   }
 };
