@@ -77,17 +77,27 @@ async function deleteTask(id) {
  * Scans all tasks from DynamoDB
  * @param {number} limit - Maximum number of items to return
  * @param {string} nextToken - Pagination token
+ * @param {boolean} excludeArchived - Whether to exclude archived tasks from results
  * @returns {Promise<Object>} Object with items and nextToken
  */
-async function scanTasks(limit, nextToken) {
+async function scanTasks(limit, nextToken, excludeArchived = false) {
   try {
     const params = {
       TableName: TABLE_NAME,
-      FilterExpression: 'begins_with(PK, :prefix)',
+      FilterExpression: excludeArchived 
+        ? 'begins_with(PK, :prefix) AND #status <> :archived'
+        : 'begins_with(PK, :prefix)',
       ExpressionAttributeValues: {
         ':prefix': 'TASK#'
       }
     };
+
+    if (excludeArchived) {
+      params.ExpressionAttributeNames = {
+        '#status': 'status'
+      };
+      params.ExpressionAttributeValues[':archived'] = 'archived';
+    }
 
     if (limit) {
       params.Limit = limit;
@@ -116,9 +126,10 @@ async function scanTasks(limit, nextToken) {
  * @param {string} assignee - Assignee identifier
  * @param {number} limit - Maximum number of items to return
  * @param {string} nextToken - Pagination token
+ * @param {boolean} excludeArchived - Whether to exclude archived tasks from results
  * @returns {Promise<Object>} Object with items and nextToken
  */
-async function queryTasksByAssignee(assignee, limit, nextToken) {
+async function queryTasksByAssignee(assignee, limit, nextToken, excludeArchived = false) {
   try {
     const params = {
       TableName: TABLE_NAME,
@@ -128,6 +139,14 @@ async function queryTasksByAssignee(assignee, limit, nextToken) {
         ':assignee': assignee
       }
     };
+
+    if (excludeArchived) {
+      params.FilterExpression = '#status <> :archived';
+      params.ExpressionAttributeNames = {
+        '#status': 'status'
+      };
+      params.ExpressionAttributeValues[':archived'] = 'archived';
+    }
 
     if (limit) {
       params.Limit = limit;
@@ -199,9 +218,10 @@ async function queryTasksByStatus(status, limit, nextToken) {
  * @param {string} priority - Task priority
  * @param {number} limit - Maximum number of items to return
  * @param {string} nextToken - Pagination token
+ * @param {boolean} excludeArchived - Whether to exclude archived tasks from results
  * @returns {Promise<Object>} Object with items and nextToken
  */
-async function queryTasksByPriority(priority, limit, nextToken) {
+async function queryTasksByPriority(priority, limit, nextToken, excludeArchived = false) {
   try {
     const params = {
       TableName: TABLE_NAME,
@@ -211,6 +231,14 @@ async function queryTasksByPriority(priority, limit, nextToken) {
         ':priority': priority
       }
     };
+
+    if (excludeArchived) {
+      params.FilterExpression = '#status <> :archived';
+      params.ExpressionAttributeNames = {
+        '#status': 'status'
+      };
+      params.ExpressionAttributeValues[':archived'] = 'archived';
+    }
 
     if (limit) {
       params.Limit = limit;

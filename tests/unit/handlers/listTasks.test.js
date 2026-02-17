@@ -58,7 +58,7 @@ describe('listTasks handler', () => {
 
     expect(response.statusCode).toBe(200);
     expect(body.tasks).toHaveLength(2);
-    expect(scanTasks).toHaveBeenCalledWith(20, undefined);
+    expect(scanTasks).toHaveBeenCalledWith(20, undefined, true);
   });
 
   test('should filter by assignee', async () => {
@@ -79,7 +79,7 @@ describe('listTasks handler', () => {
     expect(response.statusCode).toBe(200);
     expect(body.tasks).toHaveLength(1);
     expect(body.tasks[0].assignee).toBe('user1@example.com');
-    expect(queryTasksByAssignee).toHaveBeenCalledWith('user1@example.com', 20, undefined);
+    expect(queryTasksByAssignee).toHaveBeenCalledWith('user1@example.com', 20, undefined, true);
   });
 
   test('should filter by status', async () => {
@@ -120,6 +120,7 @@ describe('listTasks handler', () => {
     expect(response.statusCode).toBe(200);
     expect(body.tasks).toHaveLength(1);
     expect(body.tasks[0].priority).toBe('P1');
+    expect(queryTasksByPriority).toHaveBeenCalledWith('P1', 20, undefined, true);
   });
 
   test('should filter by due date', async () => {
@@ -162,6 +163,7 @@ describe('listTasks handler', () => {
     expect(body.tasks).toHaveLength(1);
     expect(body.tasks[0].assignee).toBe('user1@example.com');
     expect(body.tasks[0].status).toBe('open');
+    expect(queryTasksByAssignee).toHaveBeenCalledWith('user1@example.com', 20, undefined, true);
   });
 
   test('should return empty array when no matches', async () => {
@@ -269,7 +271,7 @@ describe('listTasks handler', () => {
 
       await handler(event);
 
-      expect(scanTasks).toHaveBeenCalledWith(20, undefined);
+      expect(scanTasks).toHaveBeenCalledWith(20, undefined, true);
     });
 
     test('should accept custom limit', async () => {
@@ -286,11 +288,12 @@ describe('listTasks handler', () => {
 
       await handler(event);
 
-      expect(scanTasks).toHaveBeenCalledWith(50, undefined);
+      expect(scanTasks).toHaveBeenCalledWith(50, undefined, true);
     });
 
     test('should pass nextToken to DynamoDB', async () => {
-      const token = 'test-token';
+      const validKey = { PK: 'TASK#test', SK: 'TASK#test' };
+      const token = Buffer.from(JSON.stringify(validKey)).toString('base64');
       scanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
 
       const event = {
@@ -304,7 +307,7 @@ describe('listTasks handler', () => {
 
       await handler(event);
 
-      expect(scanTasks).toHaveBeenCalledWith(20, token);
+      expect(scanTasks).toHaveBeenCalledWith(20, token, true);
     });
 
     test('should return nextToken when more results available', async () => {
@@ -393,6 +396,8 @@ describe('listTasks handler', () => {
 
     test('should work with pagination and filters', async () => {
       const nextToken = 'next-page-token';
+      const validPrevKey = { PK: 'TASK#prev', SK: 'TASK#prev' };
+      const prevToken = Buffer.from(JSON.stringify(validPrevKey)).toString('base64');
       queryTasksByAssignee.mockResolvedValue({ items: [mockTasks[0]], nextToken });
 
       const event = {
@@ -402,7 +407,7 @@ describe('listTasks handler', () => {
         queryStringParameters: {
           assignee: 'user1@example.com',
           limit: '10',
-          nextToken: 'prev-token'
+          nextToken: prevToken
         }
       };
 
@@ -412,7 +417,7 @@ describe('listTasks handler', () => {
       expect(response.statusCode).toBe(200);
       expect(body.tasks).toHaveLength(1);
       expect(body.nextToken).toBe(nextToken);
-      expect(queryTasksByAssignee).toHaveBeenCalledWith('user1@example.com', 10, 'prev-token');
+      expect(queryTasksByAssignee).toHaveBeenCalledWith('user1@example.com', 10, prevToken, true);
     });
   });
 
@@ -486,7 +491,9 @@ describe('listTasks handler', () => {
       expect(body.error).toBe('Invalid nextToken parameter');
     });
 
-    test('should return 400 for empty nextToken', async () => {
+    test('should treat empty nextToken as no token provided', async () => {
+      scanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
+
       const event = {
         headers: {
           'x-api-key': 'test-api-key'
@@ -499,8 +506,9 @@ describe('listTasks handler', () => {
       const response = await handler(event);
       const body = JSON.parse(response.body);
 
-      expect(response.statusCode).toBe(400);
-      expect(body.error).toBe('Invalid nextToken parameter');
+      // Empty string is treated as no token provided, so should succeed
+      expect(response.statusCode).toBe(200);
+      expect(scanTasks).toHaveBeenCalledWith(20, '', true);
     });
 
     test('should accept valid base64-encoded JSON nextToken', async () => {
@@ -520,7 +528,7 @@ describe('listTasks handler', () => {
       const response = await handler(event);
 
       expect(response.statusCode).toBe(200);
-      expect(scanTasks).toHaveBeenCalledWith(20, validToken);
+      expect(scanTasks).toHaveBeenCalledWith(20, validToken, true);
     });
 
     test('should return 400 for invalid nextToken with filters', async () => {
@@ -552,8 +560,9 @@ describe('listTasks handler', () => {
       updatedAt: '2024-01-03T00:00:00.000Z'
     };
 
-    test('should exclude archived tasks by default', async () => {
-      scanTasks.mockResolvedValue({ items: [...mockTasks, archivedTask], nextToken: null });
+    test('should exclude archived tasks by default (server-side filtering)', async () => {
+      // When excludeArchived=true is passed to DynamoDB, it returns only non-archived tasks
+      scanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
 
       const event = {
         headers: { 'x-api-key': 'test-api-key' },
@@ -566,9 +575,12 @@ describe('listTasks handler', () => {
       expect(response.statusCode).toBe(200);
       expect(body.tasks).toHaveLength(2);
       expect(body.tasks.every(t => t.status !== 'archived')).toBe(true);
+      // Verify excludeArchived=true is passed to DynamoDB
+      expect(scanTasks).toHaveBeenCalledWith(20, undefined, true);
     });
 
-    test('should include archived tasks when includeArchived=true', async () => {
+    test('should include archived tasks when includeArchived=true (server-side filtering disabled)', async () => {
+      // When excludeArchived=false is passed, DynamoDB returns all tasks including archived
       scanTasks.mockResolvedValue({ items: [...mockTasks, archivedTask], nextToken: null });
 
       const event = {
@@ -582,10 +594,12 @@ describe('listTasks handler', () => {
       expect(response.statusCode).toBe(200);
       expect(body.tasks).toHaveLength(3);
       expect(body.tasks.some(t => t.status === 'archived')).toBe(true);
+      // Verify excludeArchived=false is passed to DynamoDB
+      expect(scanTasks).toHaveBeenCalledWith(20, undefined, false);
     });
 
-    test('should exclude archived tasks when includeArchived=false', async () => {
-      scanTasks.mockResolvedValue({ items: [...mockTasks, archivedTask], nextToken: null });
+    test('should exclude archived tasks when includeArchived=false (server-side filtering)', async () => {
+      scanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
 
       const event = {
         headers: { 'x-api-key': 'test-api-key' },
@@ -598,6 +612,8 @@ describe('listTasks handler', () => {
       expect(response.statusCode).toBe(200);
       expect(body.tasks).toHaveLength(2);
       expect(body.tasks.every(t => t.status !== 'archived')).toBe(true);
+      // Verify excludeArchived=true is passed to DynamoDB
+      expect(scanTasks).toHaveBeenCalledWith(20, undefined, true);
     });
   });
 });

@@ -1,5 +1,6 @@
 const VALID_PRIORITIES = ['P0', 'P1', 'P2', 'P3', 'P4'];
-const VALID_STATUSES = ['open', 'in-progress', 'blocked', 'done', 'archived'];
+const VALID_STATUSES = ['open', 'in-progress', 'blocked', 'done'];
+const VALID_STATUSES_WITH_ARCHIVED = ['open', 'in-progress', 'blocked', 'done', 'archived'];
 const MAX_DESCRIPTION_LENGTH = 1000;
 const MAX_ASSIGNEE_LENGTH = 255;
 
@@ -68,13 +69,25 @@ function validatePriority(priority) {
 }
 
 /**
- * Validates status value
+ * Validates status value for write operations (createTask/updateTask)
  * @param {string} status - Status to validate
  * @returns {string|null} Error message or null if valid
  */
 function validateStatus(status) {
   if (!VALID_STATUSES.includes(status)) {
     return `Status must be one of: ${VALID_STATUSES.join(', ')}`;
+  }
+  return null;
+}
+
+/**
+ * Validates status value for read operations (listTasks filtering)
+ * @param {string} status - Status to validate
+ * @returns {string|null} Error message or null if valid
+ */
+function validateStatusForRead(status) {
+  if (!VALID_STATUSES_WITH_ARCHIVED.includes(status)) {
+    return `Status must be one of: ${VALID_STATUSES_WITH_ARCHIVED.join(', ')}`;
   }
   return null;
 }
@@ -225,11 +238,13 @@ module.exports = {
   validateTaskInput,
   validatePriority,
   validateStatus,
+  validateStatusForRead,
   validateDateFormat,
   validateDescription,
   validateAssignee,
   validateLimit,
   validateNextToken,
   VALID_PRIORITIES,
-  VALID_STATUSES
+  VALID_STATUSES,
+  VALID_STATUSES_WITH_ARCHIVED
 };

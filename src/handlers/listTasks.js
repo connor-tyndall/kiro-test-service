@@ -1,5 +1,5 @@
 const { error, success, formatTask } = require('../lib/response');
-const { validatePriority, validateStatus, validateDateFormat, validateLimit, validateNextToken } = require('../lib/validation');
+const { validatePriority, validateStatusForRead, validateDateFormat, validateLimit, validateNextToken } = require('../lib/validation');
 const { 
   scanTasks, 
   queryTasksByAssignee, 
@@ -29,8 +29,8 @@ exports.handler = async (event) => {
     if (priority && validatePriority(priority)) {
       return error(400, validatePriority(priority));
     }
-    if (status && validateStatus(status)) {
-      return error(400, validateStatus(status));
+    if (status && validateStatusForRead(status)) {
+      return error(400, validateStatusForRead(status));
     }
     if (dueDateBefore && validateDateFormat(dueDateBefore)) {
       return error(400, validateDateFormat(dueDateBefore));
@@ -55,6 +55,7 @@ exports.handler = async (event) => {
 
     // Parse includeArchived parameter (defaults to false)
     const shouldIncludeArchived = includeArchived === 'true';
+    const excludeArchived = !shouldIncludeArchived;
 
     let result;
 
@@ -63,21 +64,21 @@ exports.handler = async (event) => {
 
     if (filterCount === 0) {
       // No filters - scan all tasks
-      result = await scanTasks(parsedLimit, nextToken);
+      result = await scanTasks(parsedLimit, nextToken, excludeArchived);
     } else if (filterCount === 1) {
       // Single filter - use appropriate GSI
       if (assignee) {
-        result = await queryTasksByAssignee(assignee, parsedLimit, nextToken);
+        result = await queryTasksByAssignee(assignee, parsedLimit, nextToken, excludeArchived);
       } else if (status) {
         result = await queryTasksByStatus(status, parsedLimit, nextToken);
       } else if (priority) {
-        result = await queryTasksByPriority(priority, parsedLimit, nextToken);
+        result = await queryTasksByPriority(priority, parsedLimit, nextToken, excludeArchived);
       }
     } else {
       // Multiple filters - use most selective GSI and filter in code
       // Priority: assignee > status > priority (assignee typically most selective)
       if (assignee) {
-        result = await queryTasksByAssignee(assignee, parsedLimit, nextToken);
+        result = await queryTasksByAssignee(assignee, parsedLimit, nextToken, excludeArchived);
         
         // Apply additional filters in code
         if (status) {
@@ -95,7 +96,7 @@ exports.handler = async (event) => {
         }
       } else {
         // Only priority filter remains
-        result = await queryTasksByPriority(priority, parsedLimit, nextToken);
+        result = await queryTasksByPriority(priority, parsedLimit, nextToken, excludeArchived);
       }
     }
 
@@ -107,11 +108,6 @@ exports.handler = async (event) => {
         const taskDate = new Date(task.dueDate);
         return taskDate <= filterDate;
       });
-    }
-
-    // Exclude archived tasks by default unless includeArchived=true
-    if (!shouldIncludeArchived) {
-      result.items = result.items.filter(task => task.status !== 'archived');
     }
 
     // Format tasks

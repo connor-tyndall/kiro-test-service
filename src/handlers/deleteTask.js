@@ -1,4 +1,4 @@
-const { error } = require('../lib/response');
+const { error, success, formatTask } = require('../lib/response');
 const { getTask, putTask } = require('../lib/dynamodb');
 const { validateApiKey } = require('../lib/auth');
 
@@ -42,14 +42,8 @@ exports.handler = async (event) => {
 
     await putTask(archivedTask);
 
-    // Return 204 No Content
-    return {
-      statusCode: 204,
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: ''
-    };
+    // Return the archived task
+    return success(200, formatTask(archivedTask));
   } catch (err) {
     console.error('Error archiving task:', err);
     return error(500, 'Internal server error: archiving task');

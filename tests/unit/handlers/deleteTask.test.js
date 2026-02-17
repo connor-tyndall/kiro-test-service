@@ -35,9 +35,11 @@ describe('deleteTask handler', () => {
     };
 
     const response = await handler(event);
+    const body = JSON.parse(response.body);
 
-    expect(response.statusCode).toBe(204);
-    expect(response.body).toBe('');
+    expect(response.statusCode).toBe(200);
+    expect(body.id).toBe('123');
+    expect(body.status).toBe('archived');
     expect(putTask).toHaveBeenCalledWith(expect.objectContaining({
       id: '123',
       status: 'archived'
@@ -248,8 +250,10 @@ describe('deleteTask handler', () => {
         };
 
         const response = await handler(event);
+        const body = JSON.parse(response.body);
 
-        expect(response.statusCode).toBe(204);
+        expect(response.statusCode).toBe(200);
+        expect(body.status).toBe('archived');
         expect(putTask).toHaveBeenCalledWith(expect.objectContaining({
           status: 'archived'
         }));
