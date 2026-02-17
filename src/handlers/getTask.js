@@ -2,6 +2,7 @@ const { error, success } = require('../lib/response');
 const { getTask } = require('../lib/dynamodb');
 const { formatTask } = require('../lib/response');
 const { validateApiKey } = require('../lib/auth');
+const { validateTaskId } = require('../lib/validation');
 
 /**
  * Lambda handler for retrieving a task by ID
@@ -16,11 +17,13 @@ exports.handler = async (event) => {
   }
 
   try {
-    // Extract task ID from path parameters
+    // Extract task ID from path parameters with null safety
     const taskId = event.pathParameters?.id;
     
-    if (!taskId) {
-      return error(400, 'Task ID is required');
+    // Validate task ID
+    const taskIdError = validateTaskId(taskId);
+    if (taskIdError) {
+      return error(400, taskIdError);
     }
 
     // Retrieve task from DynamoDB

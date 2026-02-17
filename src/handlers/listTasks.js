@@ -1,5 +1,5 @@
 const { error, success, formatTask } = require('../lib/response');
-const { validatePriority, validateStatus, validateDateFormat, validateLimit, validateNextToken } = require('../lib/validation');
+const { validatePriority, validateStatus, validateDateFormat, validateLimit, validateNextToken, validateQueryStringParameters } = require('../lib/validation');
 const { 
   scanTasks, 
   queryTasksByAssignee, 
@@ -21,8 +21,14 @@ exports.handler = async (event) => {
   }
 
   try {
-    // Extract query parameters
-    const queryParams = event.queryStringParameters || {};
+    // Validate and sanitize query parameters
+    const rawQueryParams = event.queryStringParameters;
+    const { sanitized: queryParams, errors: queryParamErrors } = validateQueryStringParameters(rawQueryParams);
+    
+    if (queryParamErrors.length > 0) {
+      return error(400, queryParamErrors.join(', '));
+    }
+
     const { assignee, priority, status, dueDateBefore, limit, nextToken } = queryParams;
 
     // Validate filter parameters
@@ -36,6 +42,13 @@ exports.handler = async (event) => {
       return error(400, validateDateFormat(dueDateBefore));
     }
 
+    // Validate assignee - reject empty or whitespace-only values
+    if (assignee !== undefined && assignee !== null) {
+      if (typeof assignee === 'string' && assignee.trim().length === 0) {
+        return error(400, 'Assignee filter cannot be empty');
+      }
+    }
+
     // Validate and parse limit
     const parsedLimit = limit ? Number(limit) : 20;
     if (limit) {
@@ -45,8 +58,11 @@ exports.handler = async (event) => {
       }
     }
 
-    // Validate nextToken parameter
-    if (nextToken) {
+    // Validate nextToken parameter - check for empty or whitespace-only values
+    if (nextToken !== undefined && nextToken !== null) {
+      if (typeof nextToken === 'string' && nextToken.trim().length === 0) {
+        return error(400, 'Invalid nextToken parameter');
+      }
       const nextTokenError = validateNextToken(nextToken);
       if (nextTokenError) {
         return error(400, nextTokenError);
@@ -94,6 +110,11 @@ exports.handler = async (event) => {
         // Only priority filter remains
         result = await queryTasksByPriority(priority, parsedLimit, nextToken);
       }
+    }
+
+    // Handle edge case where result is null/undefined
+    if (!result || !result.items) {
+      result = { items: [], nextToken: null };
     }
 
     // Apply due date filter in application code

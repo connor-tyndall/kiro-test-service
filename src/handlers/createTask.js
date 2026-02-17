@@ -17,12 +17,24 @@ exports.handler = async (event) => {
   }
 
   try {
-    // Parse request body
+    // Parse request body with enhanced edge case handling
     let requestBody;
     try {
-      requestBody = JSON.parse(event.body || '{}');
+      const bodyString = event.body;
+      if (bodyString === null || bodyString === undefined) {
+        requestBody = {};
+      } else if (typeof bodyString !== 'string') {
+        return error(400, 'Request body must be a string');
+      } else {
+        requestBody = JSON.parse(bodyString || '{}');
+      }
     } catch (parseError) {
       return error(400, 'Invalid JSON in request body');
+    }
+
+    // Ensure requestBody is an object
+    if (typeof requestBody !== 'object' || requestBody === null || Array.isArray(requestBody)) {
+      return error(400, 'Request body must be a JSON object');
     }
 
     // Validate input

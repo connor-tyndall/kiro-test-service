@@ -197,7 +197,7 @@ describe('createTask handler', () => {
       const body = JSON.parse(response.body);
 
       expect(response.statusCode).toBe(400);
-      expect(body.error).toContain('Description is required');
+      expect(body.error).toContain('empty');
     });
 
     test('should handle whitespace-only description', async () => {
@@ -214,7 +214,139 @@ describe('createTask handler', () => {
       const body = JSON.parse(response.body);
 
       expect(response.statusCode).toBe(400);
+      expect(body.error).toContain('whitespace');
+    });
+
+    test('should handle null event', async () => {
+      const response = await handler(null);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toBe('Invalid request: missing event');
+    });
+
+    test('should handle event with null headers', async () => {
+      const event = {
+        headers: null,
+        body: JSON.stringify({ description: 'Test task' })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(401);
+      expect(body.error).toBe('Missing API key');
+    });
+
+    test('should handle event with missing headers', async () => {
+      const event = {
+        body: JSON.stringify({ description: 'Test task' })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(401);
+      expect(body.error).toBe('Missing API key');
+    });
+
+    test('should handle undefined body', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
       expect(body.error).toContain('Description is required');
+    });
+
+    test('should reject array body', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: JSON.stringify([{ description: 'Test task' }])
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toBe('Request body must be a JSON object');
+    });
+
+    test('should handle description at max length', async () => {
+      putTask.mockResolvedValue({});
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: JSON.stringify({
+          description: 'a'.repeat(1000)
+        })
+      };
+
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(201);
+    });
+
+    test('should reject description exceeding max length', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: JSON.stringify({
+          description: 'a'.repeat(1001)
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toContain('1000 characters');
+    });
+
+    test('should reject non-string description', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: JSON.stringify({
+          description: 12345
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toContain('string');
+    });
+
+    test('should handle multiple validation errors', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        body: JSON.stringify({
+          description: '',
+          priority: 'invalid',
+          status: 'invalid'
+        })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toContain(',');
     });
   });
 });
