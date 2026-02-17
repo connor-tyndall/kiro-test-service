@@ -541,4 +541,107 @@ describe('listTasks handler', () => {
       expect(body.error).toBe('Invalid nextToken parameter');
     });
   });
+
+  describe('Request ID Tracking', () => {
+    test('should include x-request-id header in success response', async () => {
+      scanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
+      const requestId = 'test-request-id-success';
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        requestContext: {
+          requestId: requestId
+        },
+        queryStringParameters: null
+      };
+
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['x-request-id']).toBe(requestId);
+    });
+
+    test('should include x-request-id header in error response', async () => {
+      const requestId = 'test-request-id-error';
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        requestContext: {
+          requestId: requestId
+        },
+        queryStringParameters: {
+          priority: 'invalid'
+        }
+      };
+
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(400);
+      expect(response.headers['x-request-id']).toBe(requestId);
+    });
+
+    test('should include requestId in error response body', async () => {
+      const requestId = 'test-request-id-body';
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        requestContext: {
+          requestId: requestId
+        },
+        queryStringParameters: {
+          status: 'invalid'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.requestId).toBe(requestId);
+    });
+
+    test('should use UNKNOWN when requestContext is missing', async () => {
+      scanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: null
+      };
+
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['x-request-id']).toBe('UNKNOWN');
+    });
+
+    test('should include x-request-id in 500 error response', async () => {
+      scanTasks.mockRejectedValue(new Error('DynamoDB error'));
+      const requestId = 'test-request-id-500';
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        requestContext: {
+          requestId: requestId
+        },
+        queryStringParameters: null
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(500);
+      expect(response.headers['x-request-id']).toBe(requestId);
+      expect(body.requestId).toBe(requestId);
+    });
+  });
 });

@@ -7,8 +7,10 @@ const { success } = require('../lib/response');
  * @returns {Object} API Gateway response
  */
 exports.handler = async (event) => {
+  const requestId = event.requestContext?.requestId || 'UNKNOWN';
+
   return success(200, {
     status: 'healthy',
     timestamp: new Date().toISOString()
-  });
+  }, requestId);
 };

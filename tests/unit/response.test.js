@@ -33,6 +33,44 @@ describe('Response Module', () => {
       expect(response.statusCode).toBe(200);
       expect(JSON.parse(response.body)).toEqual(body);
     });
+
+    test('should include x-request-id header when requestId is provided', () => {
+      const body = { id: '123' };
+      const requestId = 'req-12345-abcde';
+      const response = success(200, body, requestId);
+
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['x-request-id']).toBe(requestId);
+      expect(response.headers['Content-Type']).toBe('application/json');
+    });
+
+    test('should not include x-request-id header when requestId is not provided', () => {
+      const body = { id: '123' };
+      const response = success(200, body);
+
+      expect(response.headers['x-request-id']).toBeUndefined();
+    });
+
+    test('should not include x-request-id header when requestId is undefined', () => {
+      const body = { id: '123' };
+      const response = success(200, body, undefined);
+
+      expect(response.headers['x-request-id']).toBeUndefined();
+    });
+
+    test('should not include x-request-id header when requestId is null', () => {
+      const body = { id: '123' };
+      const response = success(200, body, null);
+
+      expect(response.headers['x-request-id']).toBeUndefined();
+    });
+
+    test('should not include x-request-id header when requestId is empty string', () => {
+      const body = { id: '123' };
+      const response = success(200, body, '');
+
+      expect(response.headers['x-request-id']).toBeUndefined();
+    });
   });
 
   describe('error', () => {
@@ -65,6 +103,73 @@ describe('Response Module', () => {
       const response = error(500, 'Internal error');
 
       expect(response.headers['Content-Type']).toBe('application/json');
+    });
+
+    test('should include x-request-id header when requestId is provided', () => {
+      const message = 'Task not found';
+      const requestId = 'req-12345-abcde';
+      const response = error(404, message, requestId);
+
+      expect(response.statusCode).toBe(404);
+      expect(response.headers['x-request-id']).toBe(requestId);
+      expect(response.headers['Content-Type']).toBe('application/json');
+    });
+
+    test('should include requestId field in error response body when requestId is provided', () => {
+      const message = 'Task not found';
+      const requestId = 'req-12345-abcde';
+      const response = error(404, message, requestId);
+
+      const body = JSON.parse(response.body);
+      expect(body.error).toBe(message);
+      expect(body.requestId).toBe(requestId);
+    });
+
+    test('should not include x-request-id header when requestId is not provided', () => {
+      const message = 'Task not found';
+      const response = error(404, message);
+
+      expect(response.headers['x-request-id']).toBeUndefined();
+    });
+
+    test('should not include requestId field in response body when requestId is not provided', () => {
+      const message = 'Task not found';
+      const response = error(404, message);
+
+      const body = JSON.parse(response.body);
+      expect(body.requestId).toBeUndefined();
+    });
+
+    test('should not include x-request-id header when requestId is empty string', () => {
+      const message = 'Task not found';
+      const response = error(404, message, '');
+
+      expect(response.headers['x-request-id']).toBeUndefined();
+      expect(JSON.parse(response.body).requestId).toBeUndefined();
+    });
+
+    test('should include x-request-id header and requestId in body for 500 errors', () => {
+      const message = 'Internal server error';
+      const requestId = 'req-500-error';
+      const response = error(500, message, requestId);
+
+      expect(response.statusCode).toBe(500);
+      expect(response.headers['x-request-id']).toBe(requestId);
+      const body = JSON.parse(response.body);
+      expect(body.error).toBe(message);
+      expect(body.requestId).toBe(requestId);
+    });
+
+    test('should include x-request-id header and requestId in body for 400 errors', () => {
+      const message = 'Bad request';
+      const requestId = 'req-400-error';
+      const response = error(400, message, requestId);
+
+      expect(response.statusCode).toBe(400);
+      expect(response.headers['x-request-id']).toBe(requestId);
+      const body = JSON.parse(response.body);
+      expect(body.error).toBe(message);
+      expect(body.requestId).toBe(requestId);
     });
   });
 
@@ -194,6 +299,33 @@ describe('Response Module', () => {
 
       expect(response.statusCode).toBe(200);
       expect(JSON.parse(response.body)).toEqual(body);
+    });
+
+    test('should handle success with nested objects and requestId', () => {
+      const body = {
+        task: {
+          id: '123',
+          nested: {
+            value: 'deep'
+          }
+        }
+      };
+      const requestId = 'req-nested-test';
+      const response = success(200, body, requestId);
+
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['x-request-id']).toBe(requestId);
+      expect(JSON.parse(response.body)).toEqual(body);
+    });
+
+    test('should handle error with special characters in message and requestId', () => {
+      const message = 'Error: <special> & "characters"';
+      const requestId = 'req-special-chars';
+      const response = error(500, message, requestId);
+
+      const body = JSON.parse(response.body);
+      expect(body.error).toBe(message);
+      expect(body.requestId).toBe(requestId);
     });
   });
 });

@@ -180,6 +180,95 @@ describe('updateTask handler', () => {
     expect(body.error).toBe('Invalid API key');
   });
 
+  describe('Request ID Tracking', () => {
+    test('should include x-request-id header in success response', async () => {
+      getTask.mockResolvedValue(mockExistingTask);
+      putTask.mockResolvedValue({});
+      const requestId = 'test-request-id-success';
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        requestContext: {
+          requestId: requestId
+        },
+        pathParameters: { id: '123' },
+        body: JSON.stringify({
+          description: 'Updated task'
+        })
+      };
+
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['x-request-id']).toBe(requestId);
+    });
+
+    test('should include x-request-id header in error response', async () => {
+      getTask.mockResolvedValue(null);
+      const requestId = 'test-request-id-error';
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        requestContext: {
+          requestId: requestId
+        },
+        pathParameters: { id: 'nonexistent' },
+        body: JSON.stringify({ description: 'Updated' })
+      };
+
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(404);
+      expect(response.headers['x-request-id']).toBe(requestId);
+    });
+
+    test('should include requestId in error response body', async () => {
+      getTask.mockResolvedValue(null);
+      const requestId = 'test-request-id-body';
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        requestContext: {
+          requestId: requestId
+        },
+        pathParameters: { id: 'nonexistent' },
+        body: JSON.stringify({ description: 'Updated' })
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(404);
+      expect(body.requestId).toBe(requestId);
+    });
+
+    test('should use UNKNOWN when requestContext is missing', async () => {
+      getTask.mockResolvedValue(mockExistingTask);
+      putTask.mockResolvedValue({});
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        pathParameters: { id: '123' },
+        body: JSON.stringify({
+          description: 'Updated task'
+        })
+      };
+
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['x-request-id']).toBe('UNKNOWN');
+    });
+  });
+
   describe('Edge Cases', () => {
     test('should handle DynamoDB errors', async () => {
       getTask.mockResolvedValue(mockExistingTask);
