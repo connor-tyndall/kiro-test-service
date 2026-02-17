@@ -234,6 +234,61 @@ async function queryTasksByPriority(priority, limit, nextToken) {
   }
 }
 
+/**
+ * Scans all tasks to aggregate status counts
+ * @param {string|null} assignee - Optional assignee filter
+ * @returns {Promise<Object>} Object with total count and counts by status
+ */
+async function getTaskStats(assignee) {
+  try {
+    const stats = {
+      total: 0,
+      byStatus: {
+        'open': 0,
+        'in-progress': 0,
+        'done': 0
+      }
+    };
+
+    let lastEvaluatedKey = null;
+
+    do {
+      const params = {
+        TableName: TABLE_NAME,
+        FilterExpression: 'begins_with(PK, :prefix)',
+        ExpressionAttributeValues: {
+          ':prefix': 'TASK#'
+        }
+      };
+
+      if (assignee) {
+        params.FilterExpression += ' AND assignee = :assignee';
+        params.ExpressionAttributeValues[':assignee'] = assignee;
+      }
+
+      if (lastEvaluatedKey) {
+        params.ExclusiveStartKey = lastEvaluatedKey;
+      }
+
+      const result = await docClient.send(new ScanCommand(params));
+      
+      for (const item of (result.Items || [])) {
+        stats.total++;
+        if (item.status && stats.byStatus.hasOwnProperty(item.status)) {
+          stats.byStatus[item.status]++;
+        }
+      }
+
+      lastEvaluatedKey = result.LastEvaluatedKey;
+    } while (lastEvaluatedKey);
+
+    return stats;
+  } catch (error) {
+    console.error('DynamoDB getTaskStats error:', error);
+    throw new Error('Service temporarily unavailable');
+  }
+}
+
 module.exports = {
   putTask,
   getTask,
@@ -241,5 +296,6 @@ module.exports = {
   scanTasks,
   queryTasksByAssignee,
   queryTasksByStatus,
-  queryTasksByPriority
+  queryTasksByPriority,
+  getTaskStats
 };
