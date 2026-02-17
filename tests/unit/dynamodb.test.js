@@ -23,7 +23,8 @@ const {
   scanTasks,
   queryTasksByAssignee,
   queryTasksByStatus,
-  queryTasksByPriority
+  queryTasksByPriority,
+  getTaskStats
 } = require('../../src/lib/dynamodb');
 
 describe('DynamoDB Module', () => {
@@ -239,6 +240,108 @@ describe('DynamoDB Module', () => {
 
       expect(result.items).toEqual(mockTasks);
       expect(mockSend).toHaveBeenCalled();
+    });
+  });
+
+  describe('getTaskStats', () => {
+    test('should aggregate task counts by status', async () => {
+      const mockTasks = [
+        { id: '1', status: 'open' },
+        { id: '2', status: 'open' },
+        { id: '3', status: 'in-progress' },
+        { id: '4', status: 'done' }
+      ];
+
+      mockSend.mockResolvedValue({ Items: mockTasks });
+
+      const result = await getTaskStats(null);
+
+      expect(result.total).toBe(4);
+      expect(result.byStatus.open).toBe(2);
+      expect(result.byStatus['in-progress']).toBe(1);
+      expect(result.byStatus.done).toBe(1);
+    });
+
+    test('should filter by assignee', async () => {
+      const mockTasks = [
+        { id: '1', status: 'open', assignee: 'user@example.com' },
+        { id: '2', status: 'done', assignee: 'user@example.com' }
+      ];
+
+      mockSend.mockResolvedValue({ Items: mockTasks });
+
+      const result = await getTaskStats('user@example.com');
+
+      expect(result.total).toBe(2);
+      expect(result.byStatus.open).toBe(1);
+      expect(result.byStatus.done).toBe(1);
+    });
+
+    test('should return zero counts for empty results', async () => {
+      mockSend.mockResolvedValue({ Items: [] });
+
+      const result = await getTaskStats(null);
+
+      expect(result.total).toBe(0);
+      expect(result.byStatus.open).toBe(0);
+      expect(result.byStatus['in-progress']).toBe(0);
+      expect(result.byStatus.done).toBe(0);
+    });
+
+    test('should handle pagination in DynamoDB scan', async () => {
+      const firstBatch = [
+        { id: '1', status: 'open' },
+        { id: '2', status: 'done' }
+      ];
+      const secondBatch = [
+        { id: '3', status: 'in-progress' }
+      ];
+
+      mockSend
+        .mockResolvedValueOnce({ Items: firstBatch, LastEvaluatedKey: { PK: 'TASK#2' } })
+        .mockResolvedValueOnce({ Items: secondBatch });
+
+      const result = await getTaskStats(null);
+
+      expect(result.total).toBe(3);
+      expect(result.byStatus.open).toBe(1);
+      expect(result.byStatus['in-progress']).toBe(1);
+      expect(result.byStatus.done).toBe(1);
+      expect(mockSend).toHaveBeenCalledTimes(2);
+    });
+
+    test('should handle DynamoDB errors', async () => {
+      mockSend.mockRejectedValue(new Error('DynamoDB error'));
+
+      await expect(getTaskStats(null)).rejects.toThrow('Service temporarily unavailable');
+    });
+
+    test('should ignore unknown status values', async () => {
+      const mockTasks = [
+        { id: '1', status: 'open' },
+        { id: '2', status: 'unknown-status' },
+        { id: '3', status: 'done' }
+      ];
+
+      mockSend.mockResolvedValue({ Items: mockTasks });
+
+      const result = await getTaskStats(null);
+
+      expect(result.total).toBe(3);
+      expect(result.byStatus.open).toBe(1);
+      expect(result.byStatus['in-progress']).toBe(0);
+      expect(result.byStatus.done).toBe(1);
+    });
+
+    test('should handle null Items response', async () => {
+      mockSend.mockResolvedValue({});
+
+      const result = await getTaskStats(null);
+
+      expect(result.total).toBe(0);
+      expect(result.byStatus.open).toBe(0);
+      expect(result.byStatus['in-progress']).toBe(0);
+      expect(result.byStatus.done).toBe(0);
     });
   });
 });
