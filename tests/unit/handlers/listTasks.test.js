@@ -290,7 +290,8 @@ describe('listTasks handler', () => {
     });
 
     test('should pass nextToken to DynamoDB', async () => {
-      const token = 'test-token';
+      const validKey = { PK: 'TASK#test', SK: 'TASK#test' };
+      const token = Buffer.from(JSON.stringify(validKey)).toString('base64');
       scanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
 
       const event = {
@@ -392,7 +393,9 @@ describe('listTasks handler', () => {
     });
 
     test('should work with pagination and filters', async () => {
-      const nextToken = 'next-page-token';
+      const nextToken = 'next-page-token-base64';
+      const validKey = { PK: 'TASK#prev', SK: 'TASK#prev' };
+      const prevToken = Buffer.from(JSON.stringify(validKey)).toString('base64');
       queryTasksByAssignee.mockResolvedValue({ items: [mockTasks[0]], nextToken });
 
       const event = {
@@ -402,7 +405,7 @@ describe('listTasks handler', () => {
         queryStringParameters: {
           assignee: 'user1@example.com',
           limit: '10',
-          nextToken: 'prev-token'
+          nextToken: prevToken
         }
       };
 
@@ -412,7 +415,7 @@ describe('listTasks handler', () => {
       expect(response.statusCode).toBe(200);
       expect(body.tasks).toHaveLength(1);
       expect(body.nextToken).toBe(nextToken);
-      expect(queryTasksByAssignee).toHaveBeenCalledWith('user1@example.com', 10, 'prev-token');
+      expect(queryTasksByAssignee).toHaveBeenCalledWith('user1@example.com', 10, prevToken);
     });
   });
 

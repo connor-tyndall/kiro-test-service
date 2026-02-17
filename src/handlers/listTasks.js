@@ -48,7 +48,7 @@ exports.handler = async (event) => {
     }
 
     // Validate nextToken parameter
-    if (nextToken) {
+    if (nextToken !== undefined) {
       const nextTokenError = validateNextToken(nextToken);
       if (nextTokenError) {
         return error(400, nextTokenError, requestId);
