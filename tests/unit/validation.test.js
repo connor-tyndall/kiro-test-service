@@ -7,6 +7,8 @@ const {
   validateAssignee,
   validateLimit,
   validateNextToken,
+  validateTaskId,
+  validateQueryStringParameters,
   VALID_PRIORITIES,
   VALID_STATUSES
 } = require('../../src/lib/validation');
@@ -341,6 +343,109 @@ describe('Validation Module', () => {
 
     test('should reject whitespace-only nextToken', () => {
       expect(validateNextToken('   ')).toBe('Invalid nextToken parameter');
+    });
+  });
+
+  describe('validateTaskId', () => {
+    test('should accept valid task ID', () => {
+      expect(validateTaskId('abc-123-def')).toBeNull();
+    });
+
+    test('should accept UUID task ID', () => {
+      expect(validateTaskId('550e8400-e29b-41d4-a716-446655440000')).toBeNull();
+    });
+
+    test('should reject undefined task ID', () => {
+      expect(validateTaskId(undefined)).toBe('Task ID is required');
+    });
+
+    test('should reject null task ID', () => {
+      expect(validateTaskId(null)).toBe('Task ID is required');
+    });
+
+    test('should reject empty string task ID', () => {
+      expect(validateTaskId('')).toBe('Task ID is required');
+    });
+
+    test('should reject whitespace-only task ID', () => {
+      expect(validateTaskId('   ')).toBe('Task ID is required');
+    });
+
+    test('should reject non-string task ID', () => {
+      expect(validateTaskId(123)).toBe('Task ID must be a string');
+    });
+
+    test('should reject task ID exceeding max length', () => {
+      const longId = 'a'.repeat(101);
+      expect(validateTaskId(longId)).toBe('Task ID must not exceed 100 characters');
+    });
+
+    test('should accept task ID at max length', () => {
+      const maxId = 'a'.repeat(100);
+      expect(validateTaskId(maxId)).toBeNull();
+    });
+  });
+
+  describe('validateQueryStringParameters', () => {
+    test('should return empty sanitized object for null input', () => {
+      const result = validateQueryStringParameters(null);
+      expect(result.sanitized).toEqual({});
+      expect(result.errors).toHaveLength(0);
+    });
+
+    test('should return empty sanitized object for undefined input', () => {
+      const result = validateQueryStringParameters(undefined);
+      expect(result.sanitized).toEqual({});
+      expect(result.errors).toHaveLength(0);
+    });
+
+    test('should sanitize known parameters', () => {
+      const result = validateQueryStringParameters({
+        assignee: 'user@example.com',
+        priority: 'P1',
+        status: 'open',
+        dueDateBefore: '2024-12-31',
+        limit: '10',
+        nextToken: 'abc123'
+      });
+      expect(result.sanitized).toEqual({
+        assignee: 'user@example.com',
+        priority: 'P1',
+        status: 'open',
+        dueDateBefore: '2024-12-31',
+        limit: '10',
+        nextToken: 'abc123'
+      });
+      expect(result.errors).toHaveLength(0);
+    });
+
+    test('should convert non-string values to strings', () => {
+      const result = validateQueryStringParameters({
+        limit: 10
+      });
+      expect(result.sanitized.limit).toBe('10');
+    });
+
+    test('should return error for non-object input', () => {
+      const result = validateQueryStringParameters('not an object');
+      expect(result.errors).toContain('Query parameters must be an object');
+    });
+
+    test('should ignore unknown parameters', () => {
+      const result = validateQueryStringParameters({
+        assignee: 'user@example.com',
+        unknownParam: 'value'
+      });
+      expect(result.sanitized).toEqual({
+        assignee: 'user@example.com'
+      });
+      expect(result.sanitized.unknownParam).toBeUndefined();
+    });
+
+    test('should handle empty object', () => {
+      const result = validateQueryStringParameters({});
+      expect(result.sanitized).toEqual({});
+      expect(result.errors).toHaveLength(0);
     });
   });
 

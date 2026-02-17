@@ -1,4 +1,4 @@
-const { validateTaskInput } = require('../lib/validation');
+const { validateTaskInput, validateTaskId } = require('../lib/validation');
 const { error, success, formatTask } = require('../lib/response');
 const { getTask, putTask } = require('../lib/dynamodb');
 const { validateApiKey } = require('../lib/auth');
@@ -16,17 +16,26 @@ exports.handler = async (event) => {
   }
 
   try {
-    // Extract task ID from path parameters
+    // Extract task ID from path parameters with null safety
     const taskId = event.pathParameters?.id;
     
-    if (!taskId) {
-      return error(400, 'Task ID is required');
+    // Validate task ID
+    const taskIdError = validateTaskId(taskId);
+    if (taskIdError) {
+      return error(400, taskIdError);
     }
 
     // Parse request body
     let requestBody;
     try {
-      requestBody = JSON.parse(event.body || '{}');
+      const bodyString = event.body;
+      if (bodyString === null || bodyString === undefined) {
+        requestBody = {};
+      } else if (typeof bodyString !== 'string') {
+        return error(400, 'Request body must be a string');
+      } else {
+        requestBody = JSON.parse(bodyString || '{}');
+      }
     } catch (parseError) {
       return error(400, 'Invalid JSON in request body');
     }

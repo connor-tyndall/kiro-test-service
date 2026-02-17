@@ -290,7 +290,8 @@ describe('listTasks handler', () => {
     });
 
     test('should pass nextToken to DynamoDB', async () => {
-      const token = 'test-token';
+      const validKey = { PK: 'TASK#123', SK: 'TASK#123' };
+      const token = Buffer.from(JSON.stringify(validKey)).toString('base64');
       scanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
 
       const event = {
@@ -393,6 +394,8 @@ describe('listTasks handler', () => {
 
     test('should work with pagination and filters', async () => {
       const nextToken = 'next-page-token';
+      const validKey = { PK: 'TASK#prev', SK: 'TASK#prev' };
+      const prevToken = Buffer.from(JSON.stringify(validKey)).toString('base64');
       queryTasksByAssignee.mockResolvedValue({ items: [mockTasks[0]], nextToken });
 
       const event = {
@@ -402,7 +405,7 @@ describe('listTasks handler', () => {
         queryStringParameters: {
           assignee: 'user1@example.com',
           limit: '10',
-          nextToken: 'prev-token'
+          nextToken: prevToken
         }
       };
 
@@ -412,7 +415,7 @@ describe('listTasks handler', () => {
       expect(response.statusCode).toBe(200);
       expect(body.tasks).toHaveLength(1);
       expect(body.nextToken).toBe(nextToken);
-      expect(queryTasksByAssignee).toHaveBeenCalledWith('user1@example.com', 10, 'prev-token');
+      expect(queryTasksByAssignee).toHaveBeenCalledWith('user1@example.com', 10, prevToken);
     });
   });
 
@@ -539,6 +542,157 @@ describe('listTasks handler', () => {
 
       expect(response.statusCode).toBe(400);
       expect(body.error).toBe('Invalid nextToken parameter');
+    });
+
+    test('should return 400 for empty assignee filter', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          assignee: ''
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toBe('Assignee filter cannot be empty');
+    });
+
+    test('should return 400 for whitespace-only assignee filter', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          assignee: '   '
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toBe('Assignee filter cannot be empty');
+    });
+
+    test('should handle null event', async () => {
+      const response = await handler(null);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toBe('Invalid request: missing event');
+    });
+
+    test('should handle event with null headers', async () => {
+      const event = {
+        headers: null,
+        queryStringParameters: null
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(401);
+      expect(body.error).toBe('Missing API key');
+    });
+
+    test('should handle event with missing headers', async () => {
+      const event = {
+        queryStringParameters: null
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(401);
+      expect(body.error).toBe('Missing API key');
+    });
+
+    test('should handle undefined queryStringParameters', async () => {
+      scanTasks.mockResolvedValue({ items: mockTasks, nextToken: null });
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.tasks).toHaveLength(2);
+    });
+
+    test('should handle empty result from DynamoDB', async () => {
+      scanTasks.mockResolvedValue({ items: [], nextToken: null });
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: null
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.tasks).toHaveLength(0);
+    });
+
+    test('should handle null result from DynamoDB gracefully', async () => {
+      scanTasks.mockResolvedValue(null);
+
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: null
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(200);
+      expect(body.tasks).toHaveLength(0);
+    });
+
+    test('should handle negative limit', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          limit: '-5'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toBe('Limit must be at least 1');
+    });
+
+    test('should handle invalid date format', async () => {
+      const event = {
+        headers: {
+          'x-api-key': 'test-api-key'
+        },
+        queryStringParameters: {
+          dueDateBefore: 'not-a-date'
+        }
+      };
+
+      const response = await handler(event);
+      const body = JSON.parse(response.body);
+
+      expect(response.statusCode).toBe(400);
+      expect(body.error).toContain('ISO 8601');
     });
   });
 });

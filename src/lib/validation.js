@@ -2,6 +2,7 @@ const VALID_PRIORITIES = ['P0', 'P1', 'P2', 'P3', 'P4'];
 const VALID_STATUSES = ['open', 'in-progress', 'blocked', 'done'];
 const MAX_DESCRIPTION_LENGTH = 1000;
 const MAX_ASSIGNEE_LENGTH = 255;
+const MAX_TASK_ID_LENGTH = 100;
 
 /**
  * Validates task input data
@@ -221,6 +222,68 @@ function validateNextToken(nextToken) {
   }
 }
 
+/**
+ * Validates task ID from path parameters
+ * @param {string} taskId - Task ID to validate
+ * @returns {string|null} Error message or null if valid
+ */
+function validateTaskId(taskId) {
+  if (taskId === undefined || taskId === null) {
+    return 'Task ID is required';
+  }
+
+  if (typeof taskId !== 'string') {
+    return 'Task ID must be a string';
+  }
+
+  if (taskId.trim().length === 0) {
+    return 'Task ID is required';
+  }
+
+  if (taskId.length > MAX_TASK_ID_LENGTH) {
+    return `Task ID must not exceed ${MAX_TASK_ID_LENGTH} characters`;
+  }
+
+  return null;
+}
+
+/**
+ * Validates and sanitizes query string parameters object
+ * @param {Object} queryParams - Query string parameters object
+ * @returns {Object} Object with sanitized parameters and any validation errors
+ */
+function validateQueryStringParameters(queryParams) {
+  const sanitized = {};
+  const errors = [];
+
+  if (queryParams === null || queryParams === undefined) {
+    return { sanitized, errors };
+  }
+
+  if (typeof queryParams !== 'object') {
+    errors.push('Query parameters must be an object');
+    return { sanitized, errors };
+  }
+
+  // Sanitize known parameters
+  const parameterNames = ['assignee', 'priority', 'status', 'dueDateBefore', 'limit', 'nextToken'];
+  
+  for (const param of parameterNames) {
+    if (queryParams[param] !== undefined && queryParams[param] !== null) {
+      const value = queryParams[param];
+      
+      // Handle non-string values
+      if (typeof value !== 'string') {
+        sanitized[param] = String(value);
+      } else {
+        sanitized[param] = value;
+      }
+    }
+  }
+
+  return { sanitized, errors };
+}
+
 module.exports = {
   validateTaskInput,
   validatePriority,
@@ -230,6 +293,8 @@ module.exports = {
   validateAssignee,
   validateLimit,
   validateNextToken,
+  validateTaskId,
+  validateQueryStringParameters,
   VALID_PRIORITIES,
   VALID_STATUSES
 };

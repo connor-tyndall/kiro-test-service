@@ -1,6 +1,7 @@
 const { error } = require('../lib/response');
 const { getTask, deleteTask } = require('../lib/dynamodb');
 const { validateApiKey } = require('../lib/auth');
+const { validateTaskId } = require('../lib/validation');
 
 /**
  * Lambda handler for deleting a task
@@ -15,11 +16,13 @@ exports.handler = async (event) => {
   }
 
   try {
-    // Extract task ID from path parameters
+    // Extract task ID from path parameters with null safety
     const taskId = event.pathParameters?.id;
     
-    if (!taskId) {
-      return error(400, 'Task ID is required');
+    // Validate task ID
+    const taskIdError = validateTaskId(taskId);
+    if (taskIdError) {
+      return error(400, taskIdError);
     }
 
     // Check if task exists

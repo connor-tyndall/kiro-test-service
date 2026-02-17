@@ -108,14 +108,14 @@ describe('Auth Module', () => {
   describe('Edge Cases', () => {
     test('should handle undefined event', () => {
       const result = validateApiKey(undefined);
-      expect(result.statusCode).toBe(401);
-      expect(JSON.parse(result.body).error).toBe('Missing API key');
+      expect(result.statusCode).toBe(400);
+      expect(JSON.parse(result.body).error).toBe('Invalid request: missing event');
     });
 
     test('should handle null event', () => {
       const result = validateApiKey(null);
-      expect(result.statusCode).toBe(401);
-      expect(JSON.parse(result.body).error).toBe('Missing API key');
+      expect(result.statusCode).toBe(400);
+      expect(JSON.parse(result.body).error).toBe('Invalid request: missing event');
     });
 
     test('should handle whitespace-only API key', () => {
@@ -123,6 +123,23 @@ describe('Auth Module', () => {
         headers: {
           'x-api-key': '   '
         }
+      };
+      const result = validateApiKey(event);
+      expect(result.statusCode).toBe(401);
+    });
+
+    test('should handle headers being non-object type', () => {
+      const event = {
+        headers: 'string-headers'
+      };
+      const result = validateApiKey(event);
+      expect(result.statusCode).toBe(401);
+      expect(JSON.parse(result.body).error).toBe('Missing API key');
+    });
+
+    test('should handle headers being array', () => {
+      const event = {
+        headers: ['x-api-key', 'test-key']
       };
       const result = validateApiKey(event);
       expect(result.statusCode).toBe(401);

@@ -6,7 +6,17 @@ const { error } = require('./response');
  * @returns {Object|null} Error response if invalid, null if valid
  */
 function validateApiKey(event) {
-  const apiKey = event.headers?.['x-api-key'] || event.headers?.['X-Api-Key'];
+  // Handle null/undefined event
+  if (!event) {
+    return error(400, 'Invalid request: missing event');
+  }
+
+  // Handle missing or invalid headers object
+  if (!event.headers || typeof event.headers !== 'object') {
+    return error(401, 'Missing API key');
+  }
+
+  const apiKey = event.headers['x-api-key'] || event.headers['X-Api-Key'];
   const expectedKey = process.env.API_KEY;
 
   if (!expectedKey) {
